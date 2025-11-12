@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus } from "lucide-react"
 import { DeviceCard } from "@/components/device-card"
+import { StreakCard } from "@/components/streak-card"
+import { CelebrationModal } from "@/components/celebration-modal"
 
 interface Device {
   id: string
@@ -48,12 +50,24 @@ export default function DashboardPage() {
     },
   ])
 
+  const [daysStreak, setDaysStreak] = useState(23)
+  const [bestStreak, setBestStreak] = useState(45)
+  const [showCelebration, setShowCelebration] = useState(false)
+  const [celebrationDevice, setCelebrationDevice] = useState("")
+
+  const handleFirstDevicePairing = (deviceName: string) => {
+    setCelebrationDevice(deviceName)
+    setShowCelebration(true)
+  }
+
   return (
     <div className="p-6 space-y-8">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-foreground">Your Devices</h1>
         <p className="text-muted-foreground">Manage and monitor all your connected devices</p>
       </div>
+
+      <StreakCard days={daysStreak} bestStreak={bestStreak} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {devices.map((device) => (
@@ -92,6 +106,12 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <CelebrationModal
+        isOpen={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        deviceName={celebrationDevice}
+      />
     </div>
   )
 }
