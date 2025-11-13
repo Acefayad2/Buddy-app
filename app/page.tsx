@@ -1,33 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Spinner } from "@/components/ui/spinner"
+import { useState } from "react"
+import LoginPage from "@/components/auth/login-page"
+import Dashboard from "@/components/dashboard/dashboard"
 
 export default function Home() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  useEffect(() => {
-    // TODO: Backend - Check if user is authenticated
-    // For now, redirect to login if no auth token exists
-    const hasAuth = localStorage.getItem("authToken")
-
-    if (hasAuth) {
-      router.push("/dashboard")
-    } else {
-      router.push("/auth/login")
-    }
-    setIsLoading(false)
-  }, [router])
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Spinner />
-      </div>
-    )
-  }
-
-  return null
+  return (
+    <>
+      {!isAuthenticated ? (
+        <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />
+      ) : (
+        <Dashboard onLogout={() => setIsAuthenticated(false)} />
+      )}
+    </>
+  )
 }
