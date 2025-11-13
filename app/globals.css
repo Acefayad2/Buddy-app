@@ -4,101 +4,107 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated to soft, warm blue color palette for approachable design */
-  /* Brand Colors - Soft Blue Friendly Theme */
-  --background: oklch(0.96 0 0);
-  --foreground: oklch(0.2 0 0);
+  /* Vibrant, playful color palette inspired by modern healthcare design */
+  /* Bright, cheerful colors with rich gradients for childish-yet-professional UX */
+
+  /* Background: Light and airy */
+  --background: oklch(0.98 0 0);
+  --foreground: oklch(0.15 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0 0);
+  --card-foreground: oklch(0.15 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0 0);
+  --popover-foreground: oklch(0.15 0 0);
 
-  /* Primary: Warm Blue - Friendly and approachable */
-  --primary: oklch(0.55 0.15 240);
-  --primary-foreground: oklch(0.95 0 0);
+  /* Primary: Vibrant blue - Bright and friendly */
+  --primary: oklch(0.58 0.25 250);
+  --primary-foreground: oklch(0.98 0 0);
 
-  /* Secondary: Lighter Blue - Soft and supportive */
-  --secondary: oklch(0.72 0.1 240);
-  --secondary-foreground: oklch(0.1 0 0);
+  /* Secondary: Playful purple/pink blend */
+  --secondary: oklch(0.65 0.22 290);
+  --secondary-foreground: oklch(0.98 0 0);
 
-  /* Accents */
-  --muted: oklch(0.9 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.65 0.12 240);
-  --accent-foreground: oklch(0.95 0 0);
+  /* Accent: Bright teals and pinks for pops of color */
+  --accent: oklch(0.6 0.24 180);
+  --accent-foreground: oklch(0.98 0 0);
 
-  /* Status Colors */
-  --destructive: oklch(0.62 0.22 30);
+  /* Bright accents for playful elements */
+  --muted: oklch(0.92 0.02 0);
+  --muted-foreground: oklch(0.4 0 0);
+
+  /* Status and interactive colors - Vibrant */
+  --destructive: oklch(0.65 0.25 20);
   --destructive-foreground: oklch(0.98 0 0);
 
   /* UI Elements */
-  --border: oklch(0.88 0 0);
-  --input: oklch(0.95 0 0);
-  --ring: oklch(0.55 0.15 240);
+  --border: oklch(0.85 0.02 0);
+  --input: oklch(0.97 0 0);
+  --ring: oklch(0.58 0.25 250);
 
-  /* Charts */
-  --chart-1: oklch(0.55 0.15 240);
-  --chart-2: oklch(0.65 0.12 240);
-  --chart-3: oklch(0.72 0.1 240);
-  --chart-4: oklch(0.48 0.18 240);
-  --chart-5: oklch(0.58 0.14 240);
+  /* Charts - Vibrant gradient colors */
+  --chart-1: oklch(0.58 0.25 250);
+  --chart-2: oklch(0.65 0.22 290);
+  --chart-3: oklch(0.6 0.24 180);
+  --chart-4: oklch(0.68 0.23 30);
+  --chart-5: oklch(0.62 0.24 160);
 
-  --radius: 1rem;
+  --radius: 1.5rem;
 
   /* Sidebar */
   --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.2 0 0);
-  --sidebar-primary: oklch(0.55 0.15 240);
-  --sidebar-primary-foreground: oklch(0.95 0 0);
-  --sidebar-accent: oklch(0.9 0 0);
-  --sidebar-accent-foreground: oklch(0.1 0 0);
-  --sidebar-border: oklch(0.88 0 0);
-  --sidebar-ring: oklch(0.55 0.15 240);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.58 0.25 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.92 0.02 0);
+  --sidebar-accent-foreground: oklch(0.15 0 0);
+  --sidebar-border: oklch(0.85 0.02 0);
+  --sidebar-ring: oklch(0.58 0.25 250);
 }
 
 .dark {
-  /* Dark mode with soft blue tones for night-friendly approachability */
-  --background: oklch(0.15 0 0);
-  --foreground: oklch(0.92 0 0);
-  --card: oklch(0.22 0 0);
-  --card-foreground: oklch(0.92 0 0);
-  --popover: oklch(0.22 0 0);
-  --popover-foreground: oklch(0.92 0 0);
+  /* Dark mode with vibrant, playful colors */
+  --background: oklch(0.12 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.18 0.01 250);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.18 0.01 250);
+  --popover-foreground: oklch(0.95 0 0);
 
-  /* Primary: Bright friendly blue */
-  --primary: oklch(0.62 0.18 240);
-  --primary-foreground: oklch(0.1 0 0);
+  /* Primary: Bright vibrant blue */
+  --primary: oklch(0.65 0.28 250);
+  --primary-foreground: oklch(0.12 0 0);
 
-  /* Secondary: Light blue */
-  --secondary: oklch(0.75 0.12 240);
-  --secondary-foreground: oklch(0.1 0 0);
+  /* Secondary: Bright purple/pink */
+  --secondary: oklch(0.72 0.24 290);
+  --secondary-foreground: oklch(0.12 0 0);
 
-  --muted: oklch(0.3 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.68 0.14 240);
-  --accent-foreground: oklch(0.1 0 0);
+  /* Accent: Bright teals */
+  --accent: oklch(0.68 0.26 180);
+  --accent-foreground: oklch(0.12 0 0);
 
-  --destructive: oklch(0.62 0.22 30);
+  --muted: oklch(0.28 0.01 0);
+  --muted-foreground: oklch(0.72 0 0);
+
+  --destructive: oklch(0.68 0.27 20);
   --destructive-foreground: oklch(0.95 0 0);
 
-  --border: oklch(0.28 0 0);
-  --input: oklch(0.2 0 0);
-  --ring: oklch(0.62 0.18 240);
+  --border: oklch(0.25 0.01 0);
+  --input: oklch(0.15 0.01 250);
+  --ring: oklch(0.65 0.28 250);
 
-  --chart-1: oklch(0.62 0.18 240);
-  --chart-2: oklch(0.68 0.14 240);
-  --chart-3: oklch(0.75 0.12 240);
-  --chart-4: oklch(0.55 0.16 240);
-  --chart-5: oklch(0.65 0.15 240);
+  --chart-1: oklch(0.65 0.28 250);
+  --chart-2: oklch(0.72 0.24 290);
+  --chart-3: oklch(0.68 0.26 180);
+  --chart-4: oklch(0.75 0.25 30);
+  --chart-5: oklch(0.7 0.26 160);
 
-  --sidebar: oklch(0.22 0 0);
-  --sidebar-foreground: oklch(0.92 0 0);
-  --sidebar-primary: oklch(0.62 0.18 240);
+  --sidebar: oklch(0.18 0.01 250);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.65 0.28 250);
   --sidebar-primary-foreground: oklch(0.95 0 0);
-  --sidebar-accent: oklch(0.28 0 0);
-  --sidebar-accent-foreground: oklch(0.92 0 0);
-  --sidebar-border: oklch(0.28 0 0);
-  --sidebar-ring: oklch(0.62 0.18 240);
+  --sidebar-accent: oklch(0.25 0.01 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.25 0.01 0);
+  --sidebar-ring: oklch(0.65 0.28 250);
 }
 
 @theme inline {
@@ -148,5 +154,32 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Add vibrant gradient classes for playful UI elements */
+  .gradient-primary {
+    @apply bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500;
+  }
+
+  .gradient-secondary {
+    @apply bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600;
+  }
+
+  .gradient-accent {
+    @apply bg-gradient-to-br from-orange-400 via-pink-500 to-rose-500;
+  }
+
+  .gradient-success {
+    @apply bg-gradient-to-br from-emerald-400 to-teal-600;
+  }
+
+  /* Playful border styles */
+  .border-playful {
+    @apply border-4 border-primary/30;
+  }
+
+  /* Soft shadow for playful cards */
+  .shadow-playful {
+    @apply shadow-lg shadow-primary/20;
   }
 }

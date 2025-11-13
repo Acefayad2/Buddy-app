@@ -17,9 +17,15 @@ interface Device {
 }
 
 const statusColors = {
-  connected: "bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary",
-  nearby: "bg-accent/15 text-accent dark:bg-accent/25 dark:text-accent",
-  away: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400",
+  connected: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  nearby: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  away: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+}
+
+const deviceGradients = {
+  phone: "from-blue-400 to-cyan-300",
+  tablet: "from-purple-400 to-pink-300",
+  watch: "from-orange-400 to-rose-300",
 }
 
 const deviceIcons = {
@@ -30,55 +36,56 @@ const deviceIcons = {
 
 export function DeviceCard({ device }: { device: Device }) {
   return (
-    <Card className="hover:shadow-lg transition-all duration-300 hover:border-primary/30 bg-gradient-to-br from-white to-blue-50/40 dark:from-slate-800 dark:to-slate-900 hover:scale-[1.02] hover:-translate-y-1">
+    <Card className="hover:shadow-playful transition-all duration-300 hover:border-primary/50 dark:hover:border-primary/40 hover:scale-105 hover:-translate-y-2 border-2 overflow-hidden group">
+      <div className={`h-1 bg-gradient-to-r ${deviceGradients[device.type]}`} />
       <CardContent className="p-6">
         <div className="space-y-4">
           <div className="flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl transition-transform duration-300 hover:scale-110">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-5xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-12">
                   {deviceIcons[device.type]}
                 </span>
                 <div>
-                  <h3 className="font-semibold text-lg">{device.name}</h3>
-                  <Badge className={`${statusColors[device.status]} border-none`}>
+                  <h3 className="font-bold text-lg text-foreground">{device.name}</h3>
+                  <Badge className={`${statusColors[device.status]} border-0 font-semibold`}>
                     {device.status === "connected" ? "Connected" : device.status === "nearby" ? "Nearby" : "Away"}
                   </Badge>
                 </div>
               </div>
             </div>
-            <Button variant="ghost" size="sm" asChild className="hover:text-primary hover:bg-primary/10">
+            <Button variant="ghost" size="sm" asChild className="hover:text-primary hover:bg-primary/15 rounded-full">
               <Link href={`/dashboard/device/${device.id}/settings`}>
-                <Settings2 className="w-4 h-4" />
+                <Settings2 className="w-5 h-5" />
               </Link>
             </Button>
           </div>
 
           <div className="grid grid-cols-3 gap-3 text-sm">
-            <div className="space-y-1 p-2 rounded-lg bg-primary/5 dark:bg-primary/10 transition-all duration-200 hover:bg-primary/10 dark:hover:bg-primary/20">
-              <div className="flex items-center gap-1 text-muted-foreground">
+            <div className="space-y-1 p-3 rounded-xl bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/40 dark:to-cyan-900/40 transition-all duration-200 hover:shadow-md border border-blue-200/50 dark:border-blue-800/30">
+              <div className="flex items-center gap-1 text-blue-700 dark:text-blue-300 font-semibold">
                 <Battery className="w-4 h-4" />
                 <span>Battery</span>
               </div>
-              <p className="font-semibold text-base text-primary dark:text-primary">{device.battery}%</p>
+              <p className="font-bold text-lg text-blue-600 dark:text-blue-400">{device.battery}%</p>
             </div>
-            <div className="space-y-1 p-2 rounded-lg bg-accent/5 dark:bg-accent/10 transition-all duration-200 hover:bg-accent/10 dark:hover:bg-accent/20">
-              <div className="flex items-center gap-1 text-muted-foreground">
+            <div className="space-y-1 p-3 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/40 dark:to-pink-900/40 transition-all duration-200 hover:shadow-md border border-purple-200/50 dark:border-purple-800/30">
+              <div className="flex items-center gap-1 text-purple-700 dark:text-purple-300 font-semibold">
                 <Signal className="w-4 h-4" />
                 <span>Signal</span>
               </div>
-              <p className="font-semibold text-base text-accent dark:text-accent">{device.signal}/5</p>
+              <p className="font-bold text-lg text-purple-600 dark:text-purple-400">{device.signal}/5</p>
             </div>
-            <div className="space-y-1 p-2 rounded-lg bg-secondary/10 dark:bg-secondary/20 transition-all duration-200 hover:bg-secondary/20 dark:hover:bg-secondary/30">
-              <div className="flex items-center gap-1 text-muted-foreground">
+            <div className="space-y-1 p-3 rounded-xl bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/40 dark:to-amber-900/40 transition-all duration-200 hover:shadow-md border border-orange-200/50 dark:border-orange-800/30">
+              <div className="flex items-center gap-1 text-orange-700 dark:text-orange-300 font-semibold">
                 <MapPin className="w-4 h-4" />
                 <span>Seen</span>
               </div>
-              <p className="font-semibold text-base text-xs">{device.lastSeen}</p>
+              <p className="font-bold text-sm text-orange-600 dark:text-orange-400">{device.lastSeen}</p>
             </div>
           </div>
 
-          <Button className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground hover:shadow-md hover:to-accent transition-all duration-300 hover:scale-[1.02]">
+          <Button className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/50 font-bold transition-all duration-300 hover:scale-105 border-0">
             Locate Device
           </Button>
         </div>
