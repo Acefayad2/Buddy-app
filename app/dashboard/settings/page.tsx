@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const handleDeleteAccount = () => {
     if (confirm("Are you sure? This will permanently delete your account and all associated data.")) {
       localStorage.clear()
-      router.push("/auth/login")
+      router.push("/intro")
     }
   }
 

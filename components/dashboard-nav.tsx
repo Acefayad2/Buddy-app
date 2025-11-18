@@ -12,17 +12,24 @@ export function DashboardNav() {
     localStorage.removeItem("authToken")
     localStorage.removeItem("userEmail")
     localStorage.removeItem("userName")
-    router.push("/auth/login")
+    // Clear session storage so intro shows after logout
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("introCompleted")
+    }
+    router.push("/intro")
   }
 
   return (
     <nav className="border-b border-border bg-card">
       <div className="px-6 py-4 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg">
+        <Link href="/dashboard" className="flex items-center gap-3 font-semibold text-lg">
           <div className="bg-primary rounded p-2">
             <Smartphone className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-foreground">Phone Buddy</span>
+          <div className="flex flex-col">
+            <span className="text-foreground">Phone Buddy</span>
+            <span className="text-xs text-muted-foreground font-normal">Buddy will keep you connected</span>
+          </div>
         </Link>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild>
