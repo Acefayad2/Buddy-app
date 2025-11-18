@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Sparkles, Smartphone, Wifi, Bell, Star, Bluetooth } from "lucide-react"
 import { useBluetooth } from "@/lib/hooks/use-bluetooth"
+import { isSafari } from "@/src/lib/browser-detection"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function IntroPage() {
@@ -84,8 +85,9 @@ export default function IntroPage() {
   const handleNext = () => {
     const currentStepData = steps[currentStep]
     
-    // If this step requires Bluetooth and it's not granted, don't proceed
-    if (currentStepData.requiresBluetooth && !bluetoothGranted && !bluetooth.isEnabled) {
+    // If this step requires Bluetooth and it's not granted, and it's not Safari (which doesn't support it)
+    // Safari users can proceed without Bluetooth
+    if (currentStepData.requiresBluetooth && !bluetoothGranted && !bluetooth.isEnabled && !isSafari()) {
       return
     }
 
@@ -170,7 +172,9 @@ export default function IntroPage() {
                 {!bluetooth.isSupported && (
                   <Alert className="bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
                     <AlertDescription className="text-sm text-yellow-900 dark:text-yellow-100">
-                      Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera for the best experience.
+                      {bluetooth.browserInfo.name === 'safari' 
+                        ? "Safari doesn't support Web Bluetooth. You can still use Phone Buddy to manage devices and view events. For Bluetooth scanning, use the mobile app or Chrome/Edge on desktop."
+                        : "Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera for the best experience, or use the Phone Buddy mobile app."}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -234,7 +238,7 @@ export default function IntroPage() {
           <div className="space-y-3">
             <Button
               onClick={handleNext}
-              disabled={currentStepData.requiresBluetooth && !bluetoothGranted && !bluetooth.isEnabled}
+              disabled={currentStepData.requiresBluetooth && !bluetoothGranted && !bluetooth.isEnabled && !isSafari()}
               className="w-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg border-2 border-white/30 text-lg font-semibold py-6 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
               size="lg"
             >

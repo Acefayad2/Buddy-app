@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { isSafari, getBrowserInfo, supportsWebBluetooth } from "@/src/lib/browser-detection"
 
 export interface BluetoothDevice {
   id: string
@@ -15,6 +16,11 @@ export interface BluetoothState {
   isEnabled: boolean
   error: string | null
   devices: BluetoothDevice[]
+  browserInfo: {
+    name: string
+    supportsBluetooth: boolean
+    isMobile: boolean
+  }
 }
 
 export function useBluetooth() {
@@ -25,22 +31,41 @@ export function useBluetooth() {
     isEnabled: false,
     error: null,
     devices: [],
+    browserInfo: {
+      name: 'unknown',
+      supportsBluetooth: false,
+      isMobile: false,
+    },
   })
 
   // Check if Web Bluetooth is supported
   useEffect(() => {
-    if (typeof window !== "undefined" && "bluetooth" in navigator) {
+    const browserInfo = getBrowserInfo()
+    
+    if (typeof window !== "undefined" && supportsWebBluetooth()) {
       setState((prev) => ({
         ...prev,
         isSupported: true,
         isAvailable: true,
+        browserInfo,
+        error: null,
+      }))
+    } else if (isSafari()) {
+      // Safari doesn't support Web Bluetooth - provide helpful message
+      setState((prev) => ({
+        ...prev,
+        isSupported: false,
+        isAvailable: false,
+        browserInfo,
+        error: "Safari doesn't support Web Bluetooth. For Bluetooth features, please use the Phone Buddy mobile app, or use Chrome/Edge on desktop. The web app can still manage devices and view proximity events.",
       }))
     } else {
       setState((prev) => ({
         ...prev,
         isSupported: false,
         isAvailable: false,
-        error: "Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera.",
+        browserInfo,
+        error: "Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera, or use the Phone Buddy mobile app.",
       }))
     }
   }, [])
