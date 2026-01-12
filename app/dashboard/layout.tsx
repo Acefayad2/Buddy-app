@@ -1,8 +1,3 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Spinner } from "@/components/ui/spinner"
 import { DashboardNav } from "@/components/dashboard-nav"
 
 export default function DashboardLayout({
@@ -10,31 +5,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    // Check authentication
-    const hasAuth = localStorage.getItem("authToken")
-    if (!hasAuth) {
-      router.push("/auth/signup")
-      return
-    }
-    setIsLoading(false)
-  }, [router])
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Spinner />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 bg-background">{children}</main>
     </div>
   )
 }

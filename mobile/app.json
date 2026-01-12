@@ -18,8 +18,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.phonebuddy.app",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "Phone Buddy needs Bluetooth to detect nearby devices and track proximity.",
-        "NSBluetoothPeripheralUsageDescription": "Phone Buddy needs Bluetooth to detect nearby devices and track proximity.",
+        "NSBluetoothAlwaysUsageDescription": "Phone Buddy uses Bluetooth to connect to devices and alert you if you leave one behind.",
+        "NSBluetoothPeripheralUsageDescription": "Phone Buddy uses Bluetooth to connect to nearby devices.",
+        "NSLocationWhenInUseUsageDescription": "Phone Buddy uses your location only when a device disconnects to record the last known location.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Phone Buddy uses location only when a device disconnects to record the last known location.",
         "UIBackgroundModes": [
           "bluetooth-central",
           "fetch",
@@ -37,10 +39,11 @@
       },
       "package": "com.phonebuddy.app",
       "permissions": [
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
@@ -69,12 +72,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "expo-bluetooth",
-        {
-          "bluetoothAlwaysPermission": "Phone Buddy needs Bluetooth to detect nearby devices."
-        }
-      ],
       [
         "expo-notifications",
         {

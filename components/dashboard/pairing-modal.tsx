@@ -56,7 +56,7 @@ export default function PairingModal({ isOpen, onClose, onDevicePaired }: Pairin
         signalStrength: selectedDevice.rssi,
         isConnected: true,
         distance: "5 m",
-        lastSeen: "Just now",
+        lastSeen: new Date().toISOString(),
       })
       resetModal()
     }
@@ -71,7 +71,7 @@ export default function PairingModal({ isOpen, onClose, onDevicePaired }: Pairin
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="bg-card border-border w-full max-w-md">
+      <Card className="bg-card border-blue-500 w-full max-w-md">
         <div className="p-6">
           {/* Mode Selection */}
           {step === "mode" && (

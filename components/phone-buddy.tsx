@@ -146,7 +146,7 @@ export function PhoneBuddy() {
         <div className="absolute -bottom-2 -left-8 w-2 h-2 bg-blue-500 rounded-full animate-ping" style={{ animationDelay: "1s" }} />
       </div>
 
-      <Card className={`fixed bottom-6 right-6 z-50 w-80 sm:w-96 shadow-2xl border-4 border-white/50 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-blue-900/40 backdrop-blur-sm rounded-3xl overflow-hidden ${
+      <Card className={`fixed bottom-6 right-6 z-50 w-80 sm:w-96 shadow-2xl border-4 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-blue-900/40 backdrop-blur-sm rounded-3xl overflow-hidden ${
         isAnimating ? "animate-[bounceIn_0.6s_ease-out]" : ""
       }`}>
         <div className="p-5 space-y-4">

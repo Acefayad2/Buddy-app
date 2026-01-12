@@ -81,7 +81,7 @@ export default function ActivityLog({ maxItems = 10 }: ActivityLogProps) {
   }
 
   return (
-    <Card className="bg-card border-border p-6">
+    <Card className="bg-card border-blue-500 p-6">
       <h2 className="text-xl font-semibold text-foreground mb-4">Activity Log</h2>
 
       <div className="space-y-3">

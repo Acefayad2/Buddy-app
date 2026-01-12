@@ -28,6 +28,24 @@ export default function DeviceSettingsModal({ device, isOpen, onClose, onUpdate,
   const [alertThreshold, setAlertThreshold] = useState(-80)
   const [alertType, setAlertType] = useState("sound")
 
+  const formatTimestamp = (lastSeen: string) => {
+    try {
+      const date = new Date(lastSeen)
+      if (isNaN(date.getTime())) {
+        return lastSeen
+      }
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
+    } catch {
+      return lastSeen
+    }
+  }
+
   if (!isOpen || !device) return null
 
   const handleSave = () => {
@@ -49,7 +67,7 @@ export default function DeviceSettingsModal({ device, isOpen, onClose, onUpdate,
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="bg-card border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <Card className="bg-card border-blue-500 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -129,7 +147,7 @@ export default function DeviceSettingsModal({ device, isOpen, onClose, onUpdate,
               <div className="space-y-1 text-xs text-muted-foreground">
                 <p>Signal: {device.signalStrength} dBm</p>
                 <p>Status: {device.isConnected ? "Connected" : "Disconnected"}</p>
-                <p>Last Seen: {device.lastSeen}</p>
+                <p>Last Seen: {formatTimestamp(device.lastSeen)}</p>
               </div>
             </div>
           </div>

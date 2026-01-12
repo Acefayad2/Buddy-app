@@ -14,7 +14,6 @@
     "@supabase/supabase-js": "^2.39.0",
     "expo": "~50.0.0",
     "expo-background-fetch": "~12.0.0",
-    "expo-bluetooth": "~1.0.0",
     "expo-constants": "~15.0.0",
     "expo-device": "~5.9.0",
     "expo-haptics": "~13.0.0",
@@ -26,7 +25,10 @@
     "expo-status-bar": "~1.11.0",
     "react": "18.2.0",
     "react-native": "0.73.0",
-    "react-native-ble-plx": "^3.1.1",
+    "react-native-ble-plx": "^3.5.0",
+    "react-native-device-info": "^15.0.1",
+    "react-native-geolocation-service": "^5.3.1",
+    "react-native-permissions": "^4.1.5",
     "react-native-sqlite-storage": "^6.0.1"
   },
   "devDependencies": {
@@ -36,4 +38,3 @@
   },
   "private": true
 }
-

@@ -43,10 +43,13 @@ export function useBluetooth() {
     const browserInfo = getBrowserInfo()
     
     if (typeof window !== "undefined" && supportsWebBluetooth()) {
+      // Check if permission was previously granted
+      const wasGranted = localStorage.getItem("bluetoothPermissionGranted") === "true"
       setState((prev) => ({
         ...prev,
         isSupported: true,
         isAvailable: true,
+        isEnabled: wasGranted,
         browserInfo,
         error: null,
       }))
@@ -70,7 +73,7 @@ export function useBluetooth() {
     }
   }, [])
 
-  // Request Bluetooth permission and scan for devices
+  // Request Bluetooth permission - triggers browser's native permission dialog
   const requestBluetoothPermission = useCallback(async () => {
     if (!state.isSupported) {
       setState((prev) => ({
@@ -88,32 +91,48 @@ export function useBluetooth() {
 
     try {
       // Request Bluetooth device access
-      // This will prompt the user for permission
+      // This will trigger the browser's native device picker/permission dialog
+      // The user must select a device to grant permission
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: ["battery_service", "device_information"],
       })
 
       if (device) {
+        // Permission granted - user selected a device
+        // Store that Bluetooth is now enabled
         setState((prev) => ({
           ...prev,
           isEnabled: true,
           isRequesting: false,
           error: null,
         }))
+        // Store permission status in localStorage
+        localStorage.setItem("bluetoothPermissionGranted", "true")
         return true
       }
 
       return false
     } catch (error: any) {
       let errorMessage = "Failed to access Bluetooth"
+      let permissionGranted = false
       
       if (error.name === "NotFoundError") {
-        errorMessage = "No Bluetooth device selected"
+        // User cancelled the device picker - this is okay, not a denial
+        // Check if we've previously granted permission
+        const wasGranted = localStorage.getItem("bluetoothPermissionGranted") === "true"
+        if (wasGranted) {
+          // Permission was previously granted, just user cancelled this time
+          permissionGranted = true
+          errorMessage = null
+        } else {
+          errorMessage = "Please select a Bluetooth device to grant permission. You can cancel and try again later."
+        }
       } else if (error.name === "SecurityError") {
-        errorMessage = "Bluetooth permission denied. Please enable Bluetooth in your device settings."
+        errorMessage = "Bluetooth permission denied. Please check your browser settings and allow Bluetooth access."
+        localStorage.removeItem("bluetoothPermissionGranted")
       } else if (error.name === "NetworkError") {
-        errorMessage = "Bluetooth connection failed"
+        errorMessage = "Bluetooth connection failed. Please ensure Bluetooth is enabled on your device."
       } else if (error.message) {
         errorMessage = error.message
       }
@@ -121,10 +140,10 @@ export function useBluetooth() {
       setState((prev) => ({
         ...prev,
         isRequesting: false,
-        isEnabled: false,
+        isEnabled: permissionGranted,
         error: errorMessage,
       }))
-      return false
+      return permissionGranted
     }
   }, [state.isSupported])
 
