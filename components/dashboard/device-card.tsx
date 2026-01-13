@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Wifi, Battery, MapPin, Menu, Map, Bluetooth, Navigation, ExternalLink } from "lucide-react"
@@ -21,6 +21,7 @@ interface Device {
   distance: string
   lastSeen: string
   battery?: number
+  location?: { lat: number; lng: number }
   bluetoothDeviceId?: string
   bluetoothDeviceName?: string
 }
@@ -35,6 +36,7 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
   const [showMenu, setShowMenu] = useState(false)
   const [showLocation, setShowLocation] = useState(false)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
 
   const getDeviceIcon = (type: string) => {
     const icons: Record<string, string> = {
@@ -96,23 +98,38 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
     return R * c
   }
 
-  // Format distance display
-  // Device location: San Francisco (37.7749, -122.4194)
-  // Get user's location and calculate distance
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          })
+        },
+        (error) => {
+          console.error('Error getting user location:', error)
+        }
+      )
+    }
+  }, [])
+
+  // Format distance display using real device location
   const formatDistance = (): string => {
-    const deviceLat = 37.7749
-    const deviceLon = -122.4194
-    
     if (device.isConnected) {
       // When connected, device is very close (within Bluetooth range, typically < 30 meters)
       return "< 0.1 mi"
-    } else {
-      // When offline, calculate distance from user's current location
-      // For demo purposes, using a sample user location (San Jose area, about 50 miles south)
-      // In production, you would get this from the browser's Geolocation API
-      const userLat = 37.3382 // San Jose latitude (demo)
-      const userLon = -121.8863 // San Jose longitude (demo)
-      const distanceMiles = calculateDistanceInMiles(userLat, userLon, deviceLat, deviceLon)
+    }
+    
+    // If device has location and user has location, calculate distance
+    if (device.location && userLocation) {
+      const distanceMiles = calculateDistanceInMiles(
+        userLocation.lat,
+        userLocation.lng,
+        device.location.lat,
+        device.location.lng
+      )
       
       if (distanceMiles < 0.1) {
         return "< 0.1 mi"
@@ -122,6 +139,9 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
         return `${distanceMiles.toFixed(1)} mi`
       }
     }
+    
+    // Fallback if location not available
+    return "Unknown"
   }
 
   return (
@@ -276,7 +296,7 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
               <div className="p-2 rounded-lg bg-primary/10">
                 <Map className="h-5 w-5 text-primary" />
               </div>
-              Device Location
+              {device.name} Location
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
@@ -287,55 +307,75 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
               </div>
 
               {/* Map Section */}
-              <div className="rounded-xl border border-border overflow-hidden">
-                <div className="relative w-full h-48 bg-muted/30">
-                  <iframe
-                    width="100%"
-                    height="100%"
-                    frameBorder="0"
-                    scrolling="no"
-                    marginHeight={0}
-                    marginWidth={0}
-                    src="https://www.openstreetmap.org/export/embed.html?bbox=-122.4294,37.7649,-122.4094,37.7849&layer=mapnik&marker=37.7749,-122.4194"
-                    className="w-full h-full"
-                    title="Device location map"
-                  />
+              {device.location ? (
+                <>
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <div className="relative w-full h-48 bg-muted/30">
+                      {/* Calculate bounding box around device location */}
+                      {(() => {
+                        const lat = device.location.lat
+                        const lng = device.location.lng
+                        const offset = 0.01 // ~1km
+                        const bbox = `${lng - offset},${lat - offset},${lng + offset},${lat + offset}`
+                        const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+                        return (
+                          <iframe
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            scrolling="no"
+                            marginHeight={0}
+                            marginWidth={0}
+                            src={mapUrl}
+                            className="w-full h-full"
+                            title="Device location map"
+                          />
+                        )
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-muted/50 border border-border">
+                    <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Coordinates</p>
+                    <p className="text-base font-medium text-foreground">
+                      {device.location.lat.toFixed(6)}, {device.location.lng.toFixed(6)}
+                    </p>
+                  </div>
+
+                  {/* Open in Maps Button */}
+                  <Button
+                    onClick={() => {
+                      // Open in native maps app using coordinates
+                      const lat = device.location!.lat
+                      const lng = device.location!.lng
+                      // Try to detect platform and use appropriate map URL
+                      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+                      const isAndroid = /Android/.test(navigator.userAgent)
+                      
+                      if (isIOS) {
+                        // Open in Apple Maps
+                        window.open(`maps://maps.apple.com/?ll=${lat},${lng}`, '_blank')
+                      } else if (isAndroid) {
+                        // Open in Google Maps Android
+                        window.open(`geo:${lat},${lng}?q=${lat},${lng}`, '_blank')
+                      } else {
+                        // Fallback to Google Maps web
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank')
+                      }
+                    }}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-2"
+                  >
+                    <Navigation className="h-4 w-4" />
+                    Open in Maps
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <div className="p-4 rounded-xl bg-muted/50 border border-border text-center">
+                  <p className="text-sm text-muted-foreground">Location not available yet</p>
+                  <p className="text-xs text-muted-foreground mt-2">Location will appear once the device is tracked</p>
                 </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Address</p>
-                <p className="text-base font-medium text-foreground">
-                  123 Main Street, San Francisco, CA 94102, United States
-                </p>
-              </div>
-
-              {/* Open in Maps Button */}
-              <Button
-                onClick={() => {
-                  // Open in native maps app
-                  const address = encodeURIComponent("123 Main Street, San Francisco, CA 94102, United States")
-                  // Try to detect platform and use appropriate map URL
-                  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-                  const isAndroid = /Android/.test(navigator.userAgent)
-                  
-                  if (isIOS) {
-                    // Open in Apple Maps
-                    window.open(`maps://maps.apple.com/?q=${address}`, '_blank')
-                  } else if (isAndroid) {
-                    // Open in Google Maps Android
-                    window.open(`geo:0,0?q=${address}`, '_blank')
-                  } else {
-                    // Fallback to Google Maps web
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
-                  }
-                }}
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-2"
-              >
-                <Navigation className="h-4 w-4" />
-                Open in Maps
-                <ExternalLink className="h-4 w-4" />
-              </Button>
+              )}
 
               <div className="flex items-center gap-3 pt-2 px-4">
                 <div className="p-2 rounded-lg bg-primary/10">

@@ -121,15 +121,27 @@ export default function BluetoothPairingModal({
     setError(null)
 
     try {
-      // Simulate pairing process
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Import Bluetooth connection manager
+      const { connectToPairedDevice } = await import("@/lib/bluetooth-connection")
+      
+      // Actually connect to the Bluetooth device
+      let connection = null
+      try {
+        connection = await connectToPairedDevice(
+          selectedDevice.id,
+          selectedDevice.name
+        )
+      } catch (connectError: any) {
+        // If connection fails, still create the device entry but mark as not connected
+        console.warn("Bluetooth connection failed, but device will be tracked:", connectError)
+      }
 
       // Create the paired device
       const pairedDevice = {
         id: Date.now().toString(),
         name: deviceName.trim(),
         type: deviceType,
-        status: "connected" as const,
+        status: connection?.connected ? "connected" as const : "away" as const,
         battery: 100,
         signal: selectedDevice.rssi ? Math.max(1, Math.min(5, Math.floor((selectedDevice.rssi + 100) / 20))) : 3,
         lastSeen: new Date().toISOString(),
@@ -143,6 +155,7 @@ export default function BluetoothPairingModal({
         bluetoothDeviceId: selectedDevice.id,
         bluetoothDeviceName: selectedDevice.name,
         pairedAt: new Date().toISOString(),
+        connected: connection?.connected || false,
       }
       localStorage.setItem("devicePairings", JSON.stringify(pairings))
 

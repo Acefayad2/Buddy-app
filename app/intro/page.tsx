@@ -114,6 +114,7 @@ export default function IntroPage() {
     router.push("/dashboard")
   }
 
+
   const currentStepData = steps[currentStep]
   const Icon = currentStepData.icon
 

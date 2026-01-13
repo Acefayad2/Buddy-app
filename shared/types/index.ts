@@ -24,6 +24,12 @@ export interface Device {
   device_type: 'iOS' | 'Android'
   ble_identifier: string
   created_at: string
+  updated_at?: string
+  // Location tracking fields
+  latitude?: number | null
+  longitude?: number | null
+  last_location_update?: string | null
+  location_accuracy?: number | null
 }
 
 export type NewDeviceInput = Omit<Device, 'device_id' | 'created_at'>

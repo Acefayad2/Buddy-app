@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import DeviceCard from "@/components/dashboard/device-card"
 import { SafariNotice } from "@/src/components/SafariNotice"
 import { Spinner } from "@/components/ui/spinner"
@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button"
 import AddDeviceModal from "@/components/dashboard/add-device-modal"
 import BluetoothPairingModal from "@/components/dashboard/bluetooth-pairing-modal"
 import { useBluetooth } from "@/lib/hooks/use-bluetooth"
+import { useAuth } from "@/contexts/auth-context"
+import { getDevicesForUser, createDevice, updateDevice, deleteDevice, deviceToUI } from "@/lib/devices"
+import { startLocationTracking, getCurrentLocation, updateDeviceLocationInSupabase } from "@/lib/location-tracking"
+import { getDeviceConnection, isDeviceConnected } from "@/lib/bluetooth-connection"
 
 interface Device {
   id: string
@@ -17,11 +21,14 @@ interface Device {
   battery: number
   signal: number
   lastSeen: string
+  location?: { lat: number; lng: number }
   bluetoothDeviceId?: string
   bluetoothDeviceName?: string
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth()
+  
   const [devices, setDevices] = useState<Device[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false)
@@ -31,80 +38,160 @@ export default function DashboardPage() {
   const dropZoneRef = React.useRef<HTMLDivElement>(null)
   const bluetooth = useBluetooth()
   const [bluetoothMessage, setBluetoothMessage] = useState<string | null>(null)
+  const locationTrackingCleanups = useRef<Map<string, () => void>>(new Map())
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
 
+  // Load devices from Supabase
   useEffect(() => {
-    // Load devices from localStorage or API
-    const loadDevices = () => {
+    const loadDevices = async () => {
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+
       try {
-        // Load from localStorage if available, otherwise use mock data
-        const savedDevices = localStorage.getItem("devices")
-        if (savedDevices) {
-          const parsed = JSON.parse(savedDevices)
-          // Also load pairing information for each device
-          const pairings = JSON.parse(localStorage.getItem("devicePairings") || "{}")
-          const devicesWithPairings = parsed.map((device: Device) => {
-            const pairing = pairings[device.id]
-            if (pairing) {
-              return {
-                ...device,
-                bluetoothDeviceId: pairing.bluetoothDeviceId,
-                bluetoothDeviceName: pairing.bluetoothDeviceName,
-              }
-            }
-            return device
+        const dbDevices = await getDevicesForUser(user.id)
+        const uiDevices: Device[] = dbDevices.map(dbDevice => {
+          const uiDevice = deviceToUI(dbDevice, {
+            status: 'away', // Default status - would be updated by tracking service
+            battery: undefined,
+            signal: undefined,
           })
-          setDevices(devicesWithPairings)
-        } else {
-          // For now, use mock data - replace with actual API call
-          const now = new Date()
-          const threeMinutesAgo = new Date(now.getTime() - 3 * 60 * 1000)
-          const mockDevices: Device[] = [
-            {
-              id: "1",
-              name: "My iPhone 15",
-              type: "phone",
-              status: "connected",
-              battery: 87,
-              signal: 5,
-              lastSeen: now.toISOString(),
-            },
-            {
-              id: "2",
-              name: "iPad Pro",
-              type: "tablet",
-              status: "nearby",
-              battery: 65,
-              signal: 4,
-              lastSeen: threeMinutesAgo.toISOString(),
-            },
-            {
-              id: "3",
-              name: "Apple Watch",
-              type: "watch",
-              status: "connected",
-              battery: 42,
-              signal: 5,
-              lastSeen: now.toISOString(),
-            },
-          ]
-          setDevices(mockDevices)
-        }
+          return {
+            id: uiDevice.id,
+            name: uiDevice.name,
+            type: uiDevice.type,
+            status: uiDevice.status,
+            battery: uiDevice.battery || 0,
+            signal: uiDevice.signal || 0,
+            lastSeen: uiDevice.lastSeen,
+            location: uiDevice.location, // Include location from database
+            bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+            bluetoothDeviceName: uiDevice.bluetoothDeviceName,
+          }
+        })
+        setDevices(uiDevices)
       } catch (error) {
         console.error("Error loading devices:", error)
+        setDevices([])
       } finally {
         setIsLoading(false)
       }
     }
 
     loadDevices()
-  }, [])
+  }, [user])
 
-  // Save devices to localStorage whenever they change
+  // Start location tracking for all devices
   useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem("devices", JSON.stringify(devices))
+    if (devices.length === 0) return
+
+    // Request location permission and start tracking
+    const startTracking = async () => {
+      try {
+        // Get initial location
+        const location = await getCurrentLocation()
+        setCurrentLocation({ lat: location.latitude, lng: location.longitude })
+
+        // Start tracking for each device with high accuracy (15 second updates)
+        devices.forEach((device) => {
+          // Only track if we have a device ID
+          if (device.id) {
+            const cleanup = startLocationTracking(device.id, 15000) // Update every 15 seconds for maximum accuracy
+            locationTrackingCleanups.current.set(device.id, cleanup)
+          }
+        })
+      } catch (error) {
+        console.error('Error starting location tracking:', error)
+        // Location permission denied or not available - continue without tracking
+      }
     }
-  }, [devices, isLoading])
+
+    startTracking()
+
+    // Cleanup on unmount or when devices change
+    return () => {
+      locationTrackingCleanups.current.forEach((cleanup) => cleanup())
+      locationTrackingCleanups.current.clear()
+    }
+  }, [devices.length]) // Only restart when device count changes
+
+  // Refresh devices periodically to get updated locations and Bluetooth status
+  useEffect(() => {
+    if (!user?.id) return
+
+    const interval = setInterval(async () => {
+      try {
+        const dbDevices = await getDevicesForUser(user.id)
+        const uiDevices: Device[] = dbDevices.map(dbDevice => {
+          const uiDevice = deviceToUI(dbDevice, {
+            status: 'away',
+            battery: undefined,
+            signal: undefined,
+          })
+          
+          // Check Bluetooth connection status if device has Bluetooth ID
+          let deviceStatus = uiDevice.status
+          if (uiDevice.bluetoothDeviceId) {
+            const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
+            const connection = getDeviceConnection(uiDevice.bluetoothDeviceId)
+            if (isConnected && connection) {
+              deviceStatus = 'connected'
+            } else if (connection && !connection.connected) {
+              deviceStatus = 'away'
+            }
+          }
+          
+          return {
+            id: uiDevice.id,
+            name: uiDevice.name,
+            type: uiDevice.type,
+            status: deviceStatus,
+            battery: uiDevice.battery || 0,
+            signal: uiDevice.signal || 0,
+            lastSeen: uiDevice.lastSeen,
+            location: uiDevice.location,
+            bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+            bluetoothDeviceName: uiDevice.bluetoothDeviceName,
+          }
+        })
+        setDevices(uiDevices)
+      } catch (error) {
+        console.error("Error refreshing devices:", error)
+      }
+    }, 10000) // Refresh every 10 seconds for real-time accuracy
+
+    return () => clearInterval(interval)
+  }, [user])
+
+  // Calculate distance for a device
+  const formatDistance = (device: Device): string => {
+    if (device.status === "connected") {
+      return "< 0.1 mi"
+    }
+    
+    if (device.location && currentLocation) {
+      const R = 3959 // Earth's radius in miles
+      const dLat = (device.location.lat - currentLocation.lat) * Math.PI / 180
+      const dLon = (device.location.lng - currentLocation.lng) * Math.PI / 180
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(currentLocation.lat * Math.PI / 180) * Math.cos(device.location.lat * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const distanceMiles = R * c
+      
+      if (distanceMiles < 0.1) {
+        return "< 0.1 mi"
+      } else if (distanceMiles < 1) {
+        return `${distanceMiles.toFixed(2)} mi`
+      } else {
+        return `${distanceMiles.toFixed(1)} mi`
+      }
+    }
+    
+    return "Unknown"
+  }
 
   const handleRequestBluetooth = async () => {
     setBluetoothMessage(null)
@@ -368,21 +455,35 @@ export default function DashboardPage() {
               type: device.type as "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop",
               signalStrength: device.signal * -20, // Convert to RSSI-like value
               isConnected: device.status === "connected",
-              distance: device.status === "connected" ? "Nearby" : device.status === "nearby" ? "Close" : "Far",
+              distance: formatDistance(device), // Calculate distance using location
               lastSeen: device.lastSeen,
               battery: device.battery,
+              location: device.location, // Pass location to device card
               bluetoothDeviceId: device.bluetoothDeviceId,
               bluetoothDeviceName: device.bluetoothDeviceName,
             }}
-            onUpdate={(updated) => {
-              setDevices(devices.map(d => d.id === updated.id ? {
-                ...d,
-                status: updated.isConnected ? "connected" : "away",
-                signal: Math.abs(updated.signalStrength) / 20,
-              } : d))
+            onUpdate={async (updated) => {
+              try {
+                await updateDevice(updated.id, {
+                  device_name: updated.name,
+                })
+                setDevices(devices.map(d => d.id === updated.id ? {
+                  ...d,
+                  name: updated.name,
+                  status: updated.isConnected ? "connected" : "away",
+                  signal: Math.abs(updated.signalStrength) / 20,
+                } : d))
+              } catch (error) {
+                console.error("Error updating device:", error)
+              }
             }}
-            onDelete={(id) => {
-              setDevices(devices.filter(d => d.id !== id))
+            onDelete={async (id) => {
+              try {
+                await deleteDevice(id)
+                setDevices(devices.filter(d => d.id !== id))
+              } catch (error) {
+                console.error("Error deleting device:", error)
+              }
             }}
           />
         ))}
@@ -402,28 +503,45 @@ export default function DashboardPage() {
             setShowPairingModal(false)
             setPendingDeviceType(null)
           }}
-          onDevicePaired={(pairedDevice) => {
-            // Map the paired device type to the Device interface type
-            let mappedType: "phone" | "tablet" | "watch" = "phone"
-            if (pairedDevice.type === "tablet") mappedType = "tablet"
-            else if (pairedDevice.type === "watch") mappedType = "watch"
-            // keys, earbuds, laptop default to "phone" type
+          onDevicePaired={async (pairedDevice) => {
+            if (!user?.id) return
 
-            const newDevice: Device = {
-              id: pairedDevice.id,
-              name: pairedDevice.name,
-              type: mappedType,
-              status: pairedDevice.status,
-              battery: pairedDevice.battery,
-              signal: pairedDevice.signal,
-              lastSeen: pairedDevice.lastSeen,
-              bluetoothDeviceId: pairedDevice.bluetoothDeviceId,
-              bluetoothDeviceName: pairedDevice.bluetoothDeviceName,
+            try {
+              // Create device in Supabase
+              const dbDevice = await createDevice(user.id, {
+                device_name: pairedDevice.name,
+                device_type: pairedDevice.type === 'phone' ? 'iOS' : 'Android', // Default to iOS for phones
+                ble_identifier: pairedDevice.bluetoothDeviceId || `ble-${Date.now()}`,
+              })
+
+              // Map to UI format
+              const uiDevice = deviceToUI(dbDevice, {
+                status: pairedDevice.status || 'away',
+                battery: pairedDevice.battery,
+                signal: pairedDevice.signal,
+                bluetoothDeviceId: pairedDevice.bluetoothDeviceId,
+                bluetoothDeviceName: pairedDevice.bluetoothDeviceName,
+              })
+
+              const mappedDevice: Device = {
+                id: uiDevice.id,
+                name: uiDevice.name,
+                type: uiDevice.type,
+                status: uiDevice.status,
+                battery: uiDevice.battery || 0,
+                signal: uiDevice.signal || 0,
+                lastSeen: uiDevice.lastSeen,
+                location: uiDevice.location,
+                bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+                bluetoothDeviceName: uiDevice.bluetoothDeviceName,
+              }
+
+              setDevices(prev => [...prev, mappedDevice])
+              setShowPairingModal(false)
+              setPendingDeviceType(null)
+            } catch (error) {
+              console.error("Error adding device:", error)
             }
-
-            setDevices((prev) => [...prev, newDevice])
-            setShowPairingModal(false)
-            setPendingDeviceType(null)
           }}
           deviceType={pendingDeviceType}
         />

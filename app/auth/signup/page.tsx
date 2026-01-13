@@ -10,9 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Smartphone } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function SignupPage() {
   const router = useRouter()
+  const { signUp } = useAuth()
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -52,12 +54,12 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      // TODO: Backend - Implement actual registration
-      // For now, mock the signup
-      localStorage.setItem("authToken", "mock-token-" + Date.now())
-      localStorage.setItem("userEmail", formData.email)
-      localStorage.setItem("userName", formData.fullName)
-      router.push("/dashboard")
+      const { error } = await signUp(formData.email, formData.password, formData.fullName)
+      if (error) {
+        setError(error.message || "Signup failed. Please try again.")
+      } else {
+        router.push("/dashboard")
+      }
     } catch (err) {
       setError("Signup failed. Please try again.")
       console.error(err)
@@ -133,8 +135,8 @@ export default function SignupPage() {
         </form>
         <div className="mt-6 text-center text-sm">
           <span className="text-muted-foreground">Already have an account? </span>
-          <Link href="/intro" className="text-primary hover:underline font-medium">
-            Go to Intro
+          <Link href="/dashboard" className="text-primary hover:underline font-medium">
+            Go to Dashboard
           </Link>
         </div>
       </CardContent>
