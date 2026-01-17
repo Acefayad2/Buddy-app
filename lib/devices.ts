@@ -195,6 +195,16 @@ export function deviceToUI(device: Device, additionalData?: {
   // Use last_location_update if available, otherwise use created_at
   const lastSeen = device.last_location_update || device.created_at
 
+  // Get Bluetooth ID from database (ble_identifier) or additionalData
+  // The database stores it as ble_identifier, but we expose it as bluetoothDeviceId to the UI
+  const bluetoothDeviceId = device.ble_identifier || additionalData?.bluetoothDeviceId || null
+  const bluetoothDeviceName = additionalData?.bluetoothDeviceName || null
+
+  // Debug logging to verify Bluetooth ID is being read
+  if (bluetoothDeviceId) {
+    console.log(`[deviceToUI] Device ${device.device_name} has Bluetooth ID: ${bluetoothDeviceId}`)
+  }
+
   return {
     id: device.device_id,
     name: device.device_name,
@@ -205,7 +215,7 @@ export function deviceToUI(device: Device, additionalData?: {
     lastSeen: lastSeen,
     distance: additionalData?.distance,
     location: location,
-    bluetoothDeviceId: additionalData?.bluetoothDeviceId,
-    bluetoothDeviceName: additionalData?.bluetoothDeviceName,
+    bluetoothDeviceId: bluetoothDeviceId || undefined, // Convert null to undefined
+    bluetoothDeviceName: bluetoothDeviceName || undefined, // Convert null to undefined
   }
 }
