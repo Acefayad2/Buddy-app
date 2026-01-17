@@ -125,6 +125,98 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
     }
   }, [])
 
+  // Fetch address from coordinates when location is available
+  useEffect(() => {
+    if (device.location && showLocation) {
+      setIsLoadingAddress(true)
+      setDeviceAddress(null)
+      
+      const fetchAddress = async () => {
+        try {
+          const { lat, lng } = device.location!
+          console.log(`[DeviceCard] Fetching address for coordinates: ${lat}, ${lng}`)
+          
+          // Use OpenStreetMap Nominatim API for reverse geocoding
+          // Add delay to respect rate limits (1 request per second)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            {
+              headers: {
+                'User-Agent': 'PhoneBuddy/1.0', // Required by Nominatim
+                'Accept-Language': 'en-US,en;q=0.9' // Request English address
+              }
+            }
+          )
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch address: ${response.status} ${response.statusText}`)
+          }
+          
+          const data = await response.json()
+          console.log(`[DeviceCard] Address API response:`, data)
+          
+          if (data && (data.address || data.display_name)) {
+            let formattedAddress = ''
+            
+            // Try to format address from components first (most detailed)
+            if (data.address) {
+              const addressParts = []
+              if (data.address.house_number) addressParts.push(data.address.house_number)
+              if (data.address.road || data.address.street || data.address.path) {
+                addressParts.push(data.address.road || data.address.street || data.address.path)
+              }
+              if (data.address.neighbourhood) addressParts.push(data.address.neighbourhood)
+              if (data.address.city) addressParts.push(data.address.city)
+              else if (data.address.town) addressParts.push(data.address.town)
+              else if (data.address.village) addressParts.push(data.address.village)
+              else if (data.address.municipality) addressParts.push(data.address.municipality)
+              if (data.address.state || data.address.region) addressParts.push(data.address.state || data.address.region)
+              if (data.address.postcode) addressParts.push(data.address.postcode)
+              if (data.address.country) addressParts.push(data.address.country)
+              
+              if (addressParts.length > 0) {
+                formattedAddress = addressParts.join(', ')
+              }
+            }
+            
+            // Fallback to display_name if we couldn't format from components
+            if (!formattedAddress && data.display_name) {
+              formattedAddress = data.display_name
+            }
+            
+            // Only set address if we have something meaningful (not coordinates)
+            if (formattedAddress && !formattedAddress.match(/^-?\d+\.?\d*,?\s*-?\d+\.?\d*$/)) {
+              console.log(`[DeviceCard] ✅ Setting formatted address: ${formattedAddress}`)
+              setDeviceAddress(formattedAddress)
+            } else {
+              // If all we got was coordinates, set null so we show the fallback
+              console.warn(`[DeviceCard] ⚠️ Address looks like coordinates, not setting: ${formattedAddress}`)
+              setDeviceAddress(null)
+            }
+          } else {
+            // No address data at all
+            console.warn(`[DeviceCard] ⚠️ No address data in API response`)
+            setDeviceAddress(null)
+          }
+        } catch (error: any) {
+          console.error('[DeviceCard] ❌ Error fetching address:', error.message || error)
+          // Fallback to coordinates if address fetch fails
+          setDeviceAddress(null)
+        } finally {
+          setIsLoadingAddress(false)
+        }
+      }
+      
+      fetchAddress()
+    } else if (!showLocation) {
+      // Reset address when location modal is closed
+      setDeviceAddress(null)
+      setIsLoadingAddress(false)
+    }
+  }, [device.location, showLocation])
+
   // Format distance display using real device location
   const formatDistance = (): string => {
     if (device.isConnected) {
@@ -425,12 +517,12 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
                   <div className="p-4 rounded-xl bg-muted/50 border border-border">
                     <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Address</p>
                     {isLoadingAddress ? (
-                      <p className="text-base font-medium text-foreground">Loading address...</p>
+                      <p className="text-base font-medium text-foreground animate-pulse">Loading address...</p>
                     ) : deviceAddress ? (
                       <p className="text-base font-medium text-foreground">{deviceAddress}</p>
                     ) : (
-                      <p className="text-base font-medium text-muted-foreground">
-                        {device.location.lat.toFixed(6)}, {device.location.lng.toFixed(6)}
+                      <p className="text-base font-medium text-muted-foreground italic">
+                        Unable to load address. Coordinates: {device.location.lat.toFixed(6)}, {device.location.lng.toFixed(6)}
                       </p>
                     )}
                   </div>
