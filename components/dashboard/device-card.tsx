@@ -166,12 +166,17 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
             <div>
               <div className="flex items-center gap-3">
                 <h3 className="font-bold text-foreground text-xl">{device.name}</h3>
-                {device.isConnected && (
-                  <div className="relative">
-                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/50"></div>
-                    <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 animate-ping opacity-75"></div>
-                  </div>
-                )}
+                {/* Connection status indicator - Green when connected, Red when inactive */}
+                <div className="relative">
+                  {device.isConnected ? (
+                    <>
+                      <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/50"></div>
+                      <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 animate-ping opacity-75"></div>
+                    </>
+                  ) : (
+                    <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50"></div>
+                  )}
+                </div>
                 {device.bluetoothDeviceId && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
                     <Bluetooth className="w-3 h-3 text-primary" />

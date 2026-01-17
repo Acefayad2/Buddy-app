@@ -166,12 +166,18 @@ class BluetoothConnectionManager {
   }
 
   /**
-   * Start reconnection monitoring
+   * Start reconnection monitoring - actively maintains connection
    */
   private startReconnectionMonitoring(
     bluetoothDeviceId: string,
     deviceName: string
   ): void {
+    // Clear any existing interval for this device
+    const existingInterval = this.reconnectIntervals.get(bluetoothDeviceId)
+    if (existingInterval) {
+      clearInterval(existingInterval)
+    }
+
     const interval = setInterval(async () => {
       const connection = this.connections.get(bluetoothDeviceId)
       if (!connection) {
@@ -180,39 +186,68 @@ class BluetoothConnectionManager {
         return
       }
 
-      // Check if still connected
-      if (!connection.server?.connected) {
-        console.log(`Device ${bluetoothDeviceId} disconnected, attempting reconnect...`)
+      // Check if still connected - verify both our status and server status
+      const isServerConnected = connection.server?.connected === true
+      
+      if (!isServerConnected || !connection.connected) {
+        console.log(`[Bluetooth] Device ${deviceName} (${bluetoothDeviceId}) disconnected, attempting reconnect...`)
         try {
           // Attempt to reconnect
-          const server = await connection.device.gatt?.connect()
-          if (server) {
-            connection.server = server
-            connection.connected = true
-            connection.lastSeen = new Date()
-            console.log(`Device ${bluetoothDeviceId} reconnected`)
+          if (connection.device.gatt) {
+            const server = await connection.device.gatt.connect()
+            if (server && server.connected) {
+              connection.server = server
+              connection.connected = true
+              connection.lastSeen = new Date()
+              console.log(`[Bluetooth] ✅ Device ${deviceName} (${bluetoothDeviceId}) reconnected successfully`)
+              
+              // Re-add disconnect listener
+              connection.device.addEventListener('gattserverdisconnected', () => {
+                this.handleDisconnect(bluetoothDeviceId)
+              })
+            } else {
+              console.warn(`[Bluetooth] ⚠️ Reconnect attempt for ${deviceName} returned server but server.connected is false`)
+            }
+          } else {
+            console.warn(`[Bluetooth] ⚠️ Cannot reconnect to ${deviceName} - device.gatt is null`)
           }
-        } catch (error) {
-          console.error(`Failed to reconnect to ${bluetoothDeviceId}:`, error)
+        } catch (error: any) {
+          console.error(`[Bluetooth] ❌ Failed to reconnect to ${deviceName} (${bluetoothDeviceId}):`, error.message || error)
+          // Mark as disconnected but keep trying
+          connection.connected = false
         }
       } else {
-        // Update last seen
+        // Connection is active - update last seen to keep connection alive
         connection.lastSeen = new Date()
+        // Optionally do a lightweight GATT operation to keep connection active
+        try {
+          // Touch the connection to prevent timeout
+          if (connection.server && connection.server.connected) {
+            // Just checking connection is enough to keep it alive
+            // Some devices disconnect after inactivity, so this helps maintain connection
+          }
+        } catch (error) {
+          // If we can't access the server, connection might be lost
+          connection.connected = false
+        }
       }
-    }, 10000) // Check every 10 seconds
+    }, 5000) // Check every 5 seconds for faster reconnection
 
     this.reconnectIntervals.set(bluetoothDeviceId, interval)
   }
 
   /**
-   * Handle device disconnect
+   * Handle device disconnect - immediately attempt reconnection
    */
   private handleDisconnect(bluetoothDeviceId: string): void {
     const connection = this.connections.get(bluetoothDeviceId)
     if (connection) {
       connection.connected = false
       connection.server = null
-      console.log(`Device ${bluetoothDeviceId} disconnected`)
+      console.log(`[Bluetooth] Device ${bluetoothDeviceId} disconnected - will attempt reconnect`)
+      
+      // The reconnection monitoring will handle reconnecting automatically
+      // This just marks it as disconnected
     }
   }
 

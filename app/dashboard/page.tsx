@@ -12,7 +12,7 @@ import { useBluetooth } from "@/lib/hooks/use-bluetooth"
 import { useAuth } from "@/contexts/auth-context"
 import { getDevicesForUser, createDevice, updateDevice, deleteDevice, deviceToUI } from "@/lib/devices"
 import { startLocationTracking, getCurrentLocation, updateDeviceLocationInSupabase } from "@/lib/location-tracking"
-import { getDeviceConnection, isDeviceConnected } from "@/lib/bluetooth-connection"
+import { getDeviceConnection, isDeviceConnected, connectToPairedDevice } from "@/lib/bluetooth-connection"
 
 interface Device {
   id: string
@@ -73,6 +73,24 @@ export default function DashboardPage() {
           }
         })
         setDevices(uiDevices)
+        
+        // Auto-reconnect to paired Bluetooth devices
+        uiDevices.forEach(async (device) => {
+          if (device.bluetoothDeviceId && device.bluetoothDeviceName) {
+            // Check if already connected
+            const existingConnection = getDeviceConnection(device.bluetoothDeviceId)
+            if (!existingConnection || !existingConnection.server?.connected) {
+              console.log(`[Dashboard] Auto-reconnecting to ${device.bluetoothDeviceName}...`)
+              try {
+                await connectToPairedDevice(device.bluetoothDeviceId, device.bluetoothDeviceName)
+                console.log(`[Dashboard] ✅ Successfully reconnected to ${device.bluetoothDeviceName}`)
+              } catch (error: any) {
+                console.log(`[Dashboard] ⚠️ Could not auto-reconnect to ${device.bluetoothDeviceName}:`, error.message)
+                // Don't show error - device might be off or out of range
+              }
+            }
+          }
+        })
       } catch (error) {
         console.error("Error loading devices:", error)
         setDevices([])
