@@ -242,8 +242,39 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
             </Card>
           </div>
 
-          {/* Right: Locate Button and Menu */}
+          {/* Right: Connect/Locate Button and Menu */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Connect button - show when device has Bluetooth ID but is not connected */}
+            {device.bluetoothDeviceId && !device.isConnected && (
+              <Button
+                variant="outline"
+                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary text-sm h-10 px-6 bg-background shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                onClick={async () => {
+                  if (!onConnect) return
+                  setIsConnecting(true)
+                  try {
+                    await onConnect(device)
+                  } catch (error) {
+                    console.error("Failed to connect to device:", error)
+                  } finally {
+                    setIsConnecting(false)
+                  }
+                }}
+                disabled={isConnecting}
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <Bluetooth className="w-4 h-4 mr-2" />
+                    Connect
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               className="border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary text-sm h-10 px-6 bg-background shadow-sm hover:shadow-md transition-all duration-300 font-medium"
