@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, Button, FlatList, Pressable, Alert } from "react-native";
+import { View, Text, Button, FlatList, Pressable, Alert, Switch } from "react-native";
 import { requestBluetoothPermission, goToSettings } from "../permissions/bluetooth";
 import { phoneBuddyBle } from "../ble/bleManager";
+import { phoneBuddyPeripheral } from "../ble/blePeripheral";
 
 type Row = {
   id: string;
@@ -12,6 +13,7 @@ type Row = {
 export default function BluetoothSetupScreen() {
   const [status, setStatus] = useState<string>("Idle");
   const [devices, setDevices] = useState<Map<string, Row>>(new Map());
+  const [isAdvertising, setIsAdvertising] = useState<boolean>(false);
   const list = useMemo(() => Array.from(devices.values()), [devices]);
 
   const addDevice = (d: { id: string; name: string | null; localName: string | null; rssi: number | null }) => {
@@ -75,10 +77,43 @@ export default function BluetoothSetupScreen() {
     }
   };
 
+  const toggleAdvertising = async (enabled: boolean) => {
+    try {
+      if (enabled) {
+        setStatus("Starting advertising...");
+        await phoneBuddyPeripheral.startAdvertising({ enableAdvertising: true });
+        setIsAdvertising(true);
+        setStatus(`Advertising as "${phoneBuddyPeripheral.getServiceUUID()}" - laptop can now discover this device`);
+      } else {
+        setStatus("Stopping advertising...");
+        await phoneBuddyPeripheral.stopAdvertising();
+        setIsAdvertising(false);
+        setStatus("Advertising stopped");
+      }
+    } catch (e: any) {
+      setStatus("Advertising failed.");
+      Alert.alert("Advertising failed", e?.message ?? "Unknown error. Make sure react-native-peripheral is installed.");
+      setIsAdvertising(false);
+    }
+  };
+
   return (
     <View style={{ flex: 1, padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: "600" }}>Phone Buddy BLE Test</Text>
       <Text>Status: {status}</Text>
+
+      {/* Advertising Toggle for iPhone-to-Laptop */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderWidth: 1, borderRadius: 8, backgroundColor: "#f0f0f0" }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: "600", marginBottom: 4 }}>Advertise as Peripheral</Text>
+          <Text style={{ fontSize: 12, color: "#666" }}>
+            {isAdvertising 
+              ? "Laptop can discover this iPhone via Web Bluetooth"
+              : "Enable to allow laptop to discover this device"}
+          </Text>
+        </View>
+        <Switch value={isAdvertising} onValueChange={toggleAdvertising} />
+      </View>
 
       <Button title="Enable Bluetooth & Scan" onPress={onEnableAndScan} />
 

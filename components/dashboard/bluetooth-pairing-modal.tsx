@@ -76,9 +76,33 @@ export default function BluetoothPairingModal({
       // IMPORTANT: requestDevice() only returns ONE device - the one you select
       // If you see multiple devices, that's Chrome's picker UI, not our app
       console.log("[Bluetooth] Starting Web Bluetooth scan - Chrome picker will open")
+      
+      // Phone Buddy service UUID - matches mobile app advertising
+      const PHONE_BUDDY_SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+      
+      // Try to filter for Phone Buddy service first (if iPhone is advertising)
+      // Fallback to acceptAllDevices if no Phone Buddy devices found
       const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ["battery_service", "device_information"],
+        filters: [
+          { services: [PHONE_BUDDY_SERVICE_UUID] }, // Phone Buddy service
+          { name: "Phone Buddy" }, // Or by name
+          { namePrefix: "iPhone" }, // Or iPhone devices
+        ],
+        optionalServices: [
+          PHONE_BUDDY_SERVICE_UUID,
+          "battery_service", 
+          "device_information"
+        ],
+      }).catch(async (error) => {
+        // If filtering fails, try acceptAllDevices as fallback
+        if (error.name === 'NotFoundError') {
+          console.log("[Bluetooth] No Phone Buddy devices found, scanning all devices...");
+          return navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [PHONE_BUDDY_SERVICE_UUID, "battery_service", "device_information"],
+          });
+        }
+        throw error;
       })
 
       if (device) {

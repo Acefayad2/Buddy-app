@@ -24,6 +24,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Phone Buddy uses location only when a device disconnects to record the last known location.",
         "UIBackgroundModes": [
           "bluetooth-central",
+          "bluetooth-peripheral",
           "fetch",
           "remote-notification"
         ]
