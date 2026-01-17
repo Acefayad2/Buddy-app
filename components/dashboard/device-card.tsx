@@ -52,6 +52,12 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
 
   const getSignalStrength = (rssi: number) => {
     // Convert RSSI to 1-5 scale
+    // Handle both RSSI values (negative) and signal scale (1-5)
+    if (rssi > 0 && rssi <= 5) {
+      // Already in 1-5 scale
+      return rssi
+    }
+    // Convert RSSI (negative) to 1-5 scale
     if (rssi >= -40) return 5
     if (rssi >= -50) return 4
     if (rssi >= -60) return 3
@@ -234,7 +240,10 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
             <Button
               variant="outline"
               className="border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary text-sm h-10 px-6 bg-background shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-              onClick={() => setShowLocation(true)}
+              onClick={() => {
+                console.log('[DeviceCard] Locate button clicked for device:', device.name, 'Location:', device.location)
+                setShowLocation(true)
+              }}
             >
               Locate
             </Button>

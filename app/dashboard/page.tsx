@@ -86,25 +86,29 @@ export default function DashboardPage() {
 
   // Start location tracking for all devices
   useEffect(() => {
-    if (devices.length === 0) return
+    if (devices.length === 0 || !user?.id) return
 
     // Request location permission and start tracking
     const startTracking = async () => {
       try {
+        console.log('[Location] Starting location tracking for', devices.length, 'devices')
         // Get initial location
         const location = await getCurrentLocation()
+        console.log('[Location] Initial location obtained:', location.latitude, location.longitude)
         setCurrentLocation({ lat: location.latitude, lng: location.longitude })
 
         // Start tracking for each device with high accuracy (15 second updates)
         devices.forEach((device) => {
           // Only track if we have a device ID
           if (device.id) {
+            console.log('[Location] Starting tracking for device:', device.id, device.name)
             const cleanup = startLocationTracking(device.id, 15000) // Update every 15 seconds for maximum accuracy
             locationTrackingCleanups.current.set(device.id, cleanup)
           }
         })
-      } catch (error) {
-        console.error('Error starting location tracking:', error)
+      } catch (error: any) {
+        console.error('[Location] Error starting location tracking:', error)
+        setError(`Location tracking error: ${error.message}. Please allow location access in your browser settings.`)
         // Location permission denied or not available - continue without tracking
       }
     }
@@ -113,10 +117,11 @@ export default function DashboardPage() {
 
     // Cleanup on unmount or when devices change
     return () => {
+      console.log('[Location] Cleaning up location tracking')
       locationTrackingCleanups.current.forEach((cleanup) => cleanup())
       locationTrackingCleanups.current.clear()
     }
-  }, [devices.length]) // Only restart when device count changes
+  }, [devices.length, user?.id]) // Restart when device count or user changes
 
   // Refresh devices periodically to get updated locations and Bluetooth status
   useEffect(() => {
@@ -125,6 +130,11 @@ export default function DashboardPage() {
     const interval = setInterval(async () => {
       try {
         const dbDevices = await getDevicesForUser(user.id)
+        console.log('[Dashboard] Loaded devices from database:', dbDevices.length, dbDevices.map(d => ({
+          id: d.device_id,
+          name: d.device_name,
+          location: d.latitude && d.longitude ? { lat: d.latitude, lng: d.longitude } : null
+        })))
         const uiDevices: Device[] = dbDevices.map(dbDevice => {
           const uiDevice = deviceToUI(dbDevice, {
             status: 'away',
@@ -135,6 +145,9 @@ export default function DashboardPage() {
           // Check Bluetooth connection status if device has Bluetooth ID
           // Only mark as connected if the actual Bluetooth connection is established
           let deviceStatus = 'away' // Default to away
+          let signalStrength = uiDevice.signal || 0
+          let batteryLevel = uiDevice.battery
+          
           if (uiDevice.bluetoothDeviceId) {
             const connection = getDeviceConnection(uiDevice.bluetoothDeviceId)
             const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
@@ -142,6 +155,17 @@ export default function DashboardPage() {
             // Only mark as connected if we have an active connection AND it's verified
             if (connection && connection.server && connection.server.connected && isConnected) {
               deviceStatus = 'connected'
+              // Get RSSI from connection if available
+              if (connection.rssi !== null && connection.rssi !== undefined) {
+                // Convert RSSI (-100 to -40) to signal (1-5 scale)
+                // RSSI: -40 = 5, -50 = 4, -60 = 3, -80 = 2, -100 = 1
+                if (connection.rssi >= -40) signalStrength = 5
+                else if (connection.rssi >= -50) signalStrength = 4
+                else if (connection.rssi >= -60) signalStrength = 3
+                else if (connection.rssi >= -80) signalStrength = 2
+                else signalStrength = 1
+              }
+              // TODO: Read battery from Bluetooth GATT service if available
             } else {
               // No connection or connection lost
               deviceStatus = 'away'
@@ -153,10 +177,10 @@ export default function DashboardPage() {
             name: uiDevice.name,
             type: uiDevice.type,
             status: deviceStatus,
-            battery: uiDevice.battery || 0,
-            signal: uiDevice.signal || 0,
+            battery: batteryLevel || 0,
+            signal: signalStrength,
             lastSeen: uiDevice.lastSeen,
-            location: uiDevice.location,
+            location: uiDevice.location, // Location from database
             bluetoothDeviceId: uiDevice.bluetoothDeviceId,
             bluetoothDeviceName: uiDevice.bluetoothDeviceName,
           }
@@ -459,7 +483,7 @@ export default function DashboardPage() {
               id: device.id,
               name: device.name,
               type: device.type as "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop",
-              signalStrength: device.signal * -20, // Convert to RSSI-like value
+              signalStrength: device.signal > 0 ? (device.signal * -20) : -80, // Convert signal (1-5) to RSSI-like value, default to -80 if no signal
               isConnected: device.status === "connected",
               distance: formatDistance(device), // Calculate distance using location
               lastSeen: device.lastSeen,

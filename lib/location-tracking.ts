@@ -94,14 +94,15 @@ export async function updateDeviceLocationInSupabase(
   location: LocationData
 ): Promise<void> {
   try {
+    console.log(`[Location] Updating location for device ${deviceId}:`, location.latitude, location.longitude)
     await updateDeviceLocation(deviceId, {
       latitude: location.latitude,
       longitude: location.longitude,
       accuracy: location.accuracy,
     })
-    console.log(`Location updated for device ${deviceId}`)
-  } catch (error) {
-    console.error('Failed to update device location:', error)
+    console.log(`[Location] ✅ Location updated successfully for device ${deviceId}`)
+  } catch (error: any) {
+    console.error(`[Location] ❌ Failed to update device location for ${deviceId}:`, error.message || error)
     throw error
   }
 }
