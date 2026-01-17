@@ -338,24 +338,26 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
 
           {/* Right: Connect/Locate Button and Menu */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Connect button - show when device has Bluetooth ID but is not connected */}
-            {(() => {
-              const shouldShowConnect = device.bluetoothDeviceId && !device.isConnected
-              if (device.bluetoothDeviceId) {
-                console.log(`[DeviceCard] ${device.name}: bluetoothDeviceId=${device.bluetoothDeviceId}, isConnected=${device.isConnected}, shouldShowConnect=${shouldShowConnect}`)
-              }
-              return shouldShowConnect
-            })() && (
+            {/* Connect button - always show when device has Bluetooth ID to allow manual connection/reconnection */}
+            {device.bluetoothDeviceId && (
               <Button
-                variant="outline"
-                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary text-sm h-10 px-6 bg-background shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                variant={device.isConnected ? "outline" : "default"}
+                className={
+                  device.isConnected
+                    ? "border-primary text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary text-sm h-10 px-6 bg-background shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90 text-sm h-10 px-6 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                }
                 onClick={async () => {
-                  if (!onConnect) return
+                  console.log(`[DeviceCard] Connect button clicked for ${device.name}. Current status: isConnected=${device.isConnected}, bluetoothDeviceId=${device.bluetoothDeviceId}`)
+                  if (!onConnect) {
+                    console.warn(`[DeviceCard] onConnect callback not provided for ${device.name}`)
+                    return
+                  }
                   setIsConnecting(true)
                   try {
                     await onConnect(device)
                   } catch (error) {
-                    console.error("Failed to connect to device:", error)
+                    console.error(`[DeviceCard] Failed to connect to device ${device.name}:`, error)
                   } finally {
                     setIsConnecting(false)
                   }
@@ -370,7 +372,7 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
                 ) : (
                   <>
                     <Bluetooth className="w-4 h-4 mr-2" />
-                    Connect
+                    {device.isConnected ? "Reconnect" : "Connect"}
                   </>
                 )}
               </Button>
