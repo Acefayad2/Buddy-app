@@ -152,9 +152,25 @@ export default function DashboardPage() {
             const connection = getDeviceConnection(uiDevice.bluetoothDeviceId)
             const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
             
-            // Only mark as connected if we have an active connection AND it's verified
-            if (connection && connection.server && connection.server.connected && isConnected) {
+            console.log(`[Dashboard] Device ${uiDevice.name}:`, {
+              bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+              hasConnection: !!connection,
+              serverConnected: connection?.server?.connected,
+              isConnected,
+            })
+            
+            // Check if device is connected - be more lenient with connection check
+            // Connection might be established but server.connected might not be immediately available
+            const hasActiveConnection = connection && (
+              (connection.server && connection.server.connected) || 
+              connection.connected ||
+              isConnected
+            )
+            
+            if (hasActiveConnection) {
               deviceStatus = 'connected'
+              console.log(`[Dashboard] ✅ Device ${uiDevice.name} is CONNECTED`)
+              
               // Get RSSI from connection if available
               if (connection.rssi !== null && connection.rssi !== undefined) {
                 // Convert RSSI (-100 to -40) to signal (1-5 scale)
@@ -164,11 +180,19 @@ export default function DashboardPage() {
                 else if (connection.rssi >= -60) signalStrength = 3
                 else if (connection.rssi >= -80) signalStrength = 2
                 else signalStrength = 1
+              } else {
+                // No RSSI available, set a default signal strength for connected devices
+                signalStrength = 3 // Default to middle signal when connected but no RSSI
               }
               // TODO: Read battery from Bluetooth GATT service if available
+              // For now, set a default if battery is not available
+              if (batteryLevel === undefined || batteryLevel === null) {
+                batteryLevel = 100 // Default to 100% if not available
+              }
             } else {
               // No connection or connection lost
               deviceStatus = 'away'
+              console.log(`[Dashboard] ❌ Device ${uiDevice.name} is NOT connected`)
             }
           }
           
@@ -485,6 +509,7 @@ export default function DashboardPage() {
               type: device.type as "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop",
               signalStrength: device.signal > 0 ? (device.signal * -20) : -80, // Convert signal (1-5) to RSSI-like value, default to -80 if no signal
               isConnected: device.status === "connected",
+              // Debug: Log connection status
               distance: formatDistance(device), // Calculate distance using location
               lastSeen: device.lastSeen,
               battery: device.battery,
