@@ -27,12 +27,23 @@ class PhoneBuddyBle {
       }
       if (!device) return;
 
-      onDevice({
-        id: device.id,
-        name: device.name ?? null,
-        localName: device.localName ?? null,
-        rssi: device.rssi ?? null,
-      });
+      // Apple Watch detection: Watches may not always advertise with a name
+      // They often use UUIDs in service data or manufacturer data
+      // Accept devices even without names if they have other identifiers
+      const hasName = device.name || device.localName;
+      const hasServices = device.serviceUUIDs && device.serviceUUIDs.length > 0;
+      const hasManufacturerData = device.manufacturerData;
+      
+      // Include devices with names OR identifiable service/manufacturer data
+      // This helps catch Apple Watches and other devices that don't advertise names
+      if (hasName || hasServices || hasManufacturerData) {
+        onDevice({
+          id: device.id,
+          name: device.name ?? device.localName ?? "Unknown Device",
+          localName: device.localName ?? null,
+          rssi: device.rssi ?? null,
+        });
+      }
     });
 
     if (this.scanStopTimer) clearTimeout(this.scanStopTimer);
