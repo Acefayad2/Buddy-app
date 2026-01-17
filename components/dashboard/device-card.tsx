@@ -290,35 +290,41 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
 
           {/* Center: Icon Cards for Signal, Battery, Location */}
           <div className="flex items-center gap-4 flex-1">
-            {/* Signal Card - Only show when connected */}
-            {device.isConnected && (
-              <Card className="border-blue-500 p-5 bg-muted/50 hover:bg-muted transition-all duration-300 group-hover:border-blue-600">
+            {/* Signal Card - Show when device is paired (has Bluetooth ID) */}
+            {device.bluetoothDeviceId && (
+              <Card className={`border-blue-500 p-5 bg-muted/50 hover:bg-muted transition-all duration-300 group-hover:border-blue-600 ${!device.isConnected ? 'opacity-60' : ''}`}>
                 <div className="flex flex-col items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-background/80">
-                    <Wifi className="w-5 h-5 text-primary" />
+                    <Wifi className={`w-5 h-5 ${device.isConnected ? 'text-primary' : 'text-muted-foreground'}`} />
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center">Signal</span>
-                  <span className="text-base font-bold text-foreground text-center">
-                    {getSignalStrength(device.signalStrength)}/5
+                  <span className={`text-base font-bold text-center ${device.isConnected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {device.isConnected 
+                      ? `${getSignalStrength(device.signalStrength)}/5`
+                      : '--'
+                    }
                   </span>
                 </div>
               </Card>
             )}
 
-            {/* Battery Card - Only show when connected */}
-            {device.isConnected && (
-              <Card className="border-blue-500 p-5 bg-muted/50 hover:bg-muted transition-all duration-300 group-hover:border-blue-600">
+            {/* Battery Card - Show when device is paired (has Bluetooth ID) */}
+            {device.bluetoothDeviceId && (
+              <Card className={`border-blue-500 p-5 bg-muted/50 hover:bg-muted transition-all duration-300 group-hover:border-blue-600 ${!device.isConnected ? 'opacity-60' : ''}`}>
                 <div className="flex flex-col items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-background/80">
-                    <Battery className={`w-5 h-5 ${getBatteryColor(device.battery)}`} />
+                    <Battery className={`w-5 h-5 ${device.isConnected ? getBatteryColor(device.battery) : 'text-muted-foreground'}`} />
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center">Battery</span>
                   <span className={`text-base font-bold text-center ${
-                    device.battery !== undefined 
+                    device.isConnected && device.battery !== undefined
                       ? getBatteryColor(device.battery) 
                       : "text-muted-foreground"
                   }`}>
-                    {device.battery !== undefined ? `${device.battery}%` : "N/A"}
+                    {device.isConnected && device.battery !== undefined 
+                      ? `${device.battery}%` 
+                      : '--'
+                    }
                   </span>
                 </div>
               </Card>
