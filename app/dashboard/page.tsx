@@ -558,6 +558,78 @@ export default function DashboardPage() {
                 console.error("Error deleting device:", error)
               }
             }}
+            onConnect={async (device) => {
+              if (!device.bluetoothDeviceId || !device.bluetoothDeviceName) {
+                setError("Cannot connect: Device does not have Bluetooth information")
+                return
+              }
+              
+              try {
+                console.log(`[Dashboard] Manual connect requested for ${device.bluetoothDeviceName}`)
+                setError(null)
+                await connectToPairedDevice(device.bluetoothDeviceId, device.bluetoothDeviceName)
+                console.log(`[Dashboard] ✅ Successfully connected to ${device.bluetoothDeviceName}`)
+                
+                // Reload devices to update connection status
+                const dbDevices = await getDevicesForUser(user.id!)
+                const uiDevices: Device[] = dbDevices.map(dbDevice => {
+                  const uiDevice = deviceToUI(dbDevice, {
+                    status: 'away',
+                    battery: undefined,
+                    signal: undefined,
+                  })
+                  
+                  let deviceStatus = 'away'
+                  let signalStrength = uiDevice.signal || 0
+                  let batteryLevel = uiDevice.battery
+                  
+                  if (uiDevice.bluetoothDeviceId) {
+                    const connection = getDeviceConnection(uiDevice.bluetoothDeviceId)
+                    const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
+                    
+                    const hasActiveConnection = connection && (
+                      (connection.server && connection.server.connected) || 
+                      connection.connected ||
+                      isConnected
+                    )
+                    
+                    if (hasActiveConnection) {
+                      deviceStatus = 'connected'
+                      if (connection.rssi !== null && connection.rssi !== undefined) {
+                        if (connection.rssi >= -40) signalStrength = 5
+                        else if (connection.rssi >= -50) signalStrength = 4
+                        else if (connection.rssi >= -60) signalStrength = 3
+                        else if (connection.rssi >= -80) signalStrength = 2
+                        else signalStrength = 1
+                      } else {
+                        signalStrength = 3
+                      }
+                      if (batteryLevel === undefined || batteryLevel === null) {
+                        batteryLevel = 100
+                      }
+                    }
+                  }
+                  
+                  return {
+                    id: uiDevice.id,
+                    name: uiDevice.name,
+                    type: uiDevice.type,
+                    status: deviceStatus,
+                    battery: batteryLevel || 0,
+                    signal: signalStrength,
+                    lastSeen: uiDevice.lastSeen,
+                    location: uiDevice.location,
+                    bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+                    bluetoothDeviceName: uiDevice.bluetoothDeviceName,
+                  }
+                })
+                setDevices(uiDevices)
+              } catch (error: any) {
+                console.error(`[Dashboard] Failed to connect to ${device.name}:`, error)
+                setError(`Failed to connect to ${device.bluetoothDeviceName}: ${error.message || 'Please make sure the device is powered on and in range'}`)
+                throw error
+              }
+            }}
           />
         ))}
       </div>

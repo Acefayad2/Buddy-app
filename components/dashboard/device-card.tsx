@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Wifi, Battery, MapPin, Menu, Map, Bluetooth, Navigation, ExternalLink } from "lucide-react"
+import { Wifi, Battery, MapPin, Menu, Map, Bluetooth, Navigation, ExternalLink, Loader2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -30,13 +30,15 @@ interface DeviceCardProps {
   device: Device
   onUpdate?: (device: Device) => void
   onDelete?: (deviceId: string) => void
+  onConnect?: (device: Device) => Promise<void>
 }
 
-export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardProps) {
+export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showLocation, setShowLocation] = useState(false)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
 
   const getDeviceIcon = (type: string) => {
     const icons: Record<string, string> = {
@@ -269,6 +271,38 @@ export default function DeviceCard({ device, onUpdate, onDelete }: DeviceCardPro
             <DialogTitle className="text-xl font-bold">{device.name} Options</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-2 py-4">
+            {/* Connect button - only show if device has Bluetooth ID and is not connected */}
+            {device.bluetoothDeviceId && !device.isConnected && (
+              <Button
+                variant="outline"
+                className="justify-start text-left h-auto py-4 px-5 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 rounded-lg"
+                onClick={async () => {
+                  if (!onConnect) return
+                  setIsConnecting(true)
+                  try {
+                    await onConnect(device)
+                  } catch (error) {
+                    console.error("Failed to connect to device:", error)
+                  } finally {
+                    setIsConnecting(false)
+                    setShowMenu(false)
+                  }
+                }}
+                disabled={isConnecting}
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <span className="text-base font-medium">Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Bluetooth className="w-4 h-4 mr-2" />
+                    <span className="text-base font-medium">Connect</span>
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               className="justify-start text-left h-auto py-4 px-5 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 rounded-lg"
