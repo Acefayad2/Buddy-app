@@ -21,9 +21,10 @@ const deviceIcons: DeviceIcon[] = [
 interface AddDeviceModalProps {
   isOpen: boolean
   onClose: () => void
+  onDeviceTypeSelect?: (deviceType: "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop") => void
 }
 
-export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps) {
+export default function AddDeviceModal({ isOpen, onClose, onDeviceTypeSelect }: AddDeviceModalProps) {
   const [draggedIcon, setDraggedIcon] = useState<DeviceIcon | null>(null)
 
   const handleDragStart = (e: React.DragEvent, icon: DeviceIcon) => {
@@ -56,7 +57,7 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
         <DialogHeader>
           <DialogTitle>Add New Device</DialogTitle>
           <DialogDescription>
-            Drag and drop a device icon into the "Your Devices" section below
+            Click or drag a device icon to add it to your devices
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-3 gap-4 py-4">
@@ -66,12 +67,25 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
               draggable
               onDragStart={(e) => handleDragStart(e, device)}
               onDragEnd={handleDragEnd}
+              onClick={() => {
+                // Mobile-friendly: allow clicking instead of dragging
+                if (onDeviceTypeSelect) {
+                  onDeviceTypeSelect(device.type)
+                  onClose()
+                } else {
+                  // Fallback: use drag data if onDeviceTypeSelect not provided
+                  const event = new Event('deviceSelected') as any
+                  event.deviceType = device.type
+                  document.dispatchEvent(event)
+                  onClose()
+                }
+              }}
               className={`
                 flex flex-col items-center justify-center p-6 
-                border-2 border-gray-200 rounded-lg cursor-grab
-                hover:border-primary hover:bg-gray-50 transition-all
+                border-2 border-gray-200 rounded-lg cursor-pointer
+                hover:border-primary hover:bg-gray-50 active:bg-gray-100 transition-all
                 ${draggedIcon?.type === device.type ? "opacity-50" : ""}
-                active:cursor-grabbing
+                touch-manipulation
               `}
             >
               <div className="relative text-5xl mb-2 device-icon-wrapper" data-device-type={device.type}>

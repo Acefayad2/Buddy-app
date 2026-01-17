@@ -45,11 +45,12 @@ export default function BluetoothPairingModal({
   useEffect(() => {
     if (isOpen) {
       setStep("scan")
-      setScannedDevices([])
+      setScannedDevices([]) // Clear all devices - start fresh
       setSelectedDevice(null)
       setDeviceName("")
       setError(null)
       setIsScanning(false)
+      console.log("[Bluetooth] Modal opened - cleared device list")
     }
   }, [isOpen])
 
@@ -69,41 +70,50 @@ export default function BluetoothPairingModal({
     }
 
     try {
-      // Check if Bluetooth permission was already granted
-      // If not, request it first
-      if (!bluetooth.isEnabled) {
-        const hasPermission = await bluetooth.requestBluetoothPermission()
-        if (!hasPermission) {
-          // User cancelled or permission denied
-          if (bluetooth.error && bluetooth.error.includes("select a Bluetooth device")) {
-            setError("Please select a Bluetooth device from the picker to grant permission. You can cancel and try again.")
-          } else {
-            setError(bluetooth.error || "Bluetooth permission is required. Please enable Bluetooth access first.")
-          }
-          setIsScanning(false)
-          return
-        }
-      }
+      // Web Bluetooth API: requestDevice() immediately shows the browser's device picker
+      // The browser will scan for and display available BLE devices
+      // User must select a device from the browser's picker dialog
+      // IMPORTANT: requestDevice() only returns ONE device - the one you select
+      // If you see multiple devices, that's Chrome's picker UI, not our app
+      console.log("[Bluetooth] Starting Web Bluetooth scan - Chrome picker will open")
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ["battery_service", "device_information"],
+      })
 
-      // Permission is granted, now scan for devices
-      // Note: Web Bluetooth API doesn't have a direct scanning API
-      // In a real implementation, you would use the Bluetooth scanning API or
-      // request devices one by one. For now, we'll simulate device discovery.
-      setTimeout(() => {
-        const mockDevices: BTDevice[] = [
-          { id: "bt-device-1", name: "iPhone 15 Pro", rssi: -65 },
-          { id: "bt-device-2", name: "Samsung Galaxy S24", rssi: -72 },
-          { id: "bt-device-3", name: "iPad Pro", rssi: -78 },
-          { id: "bt-device-4", name: "Apple Watch", rssi: -68 },
-          { id: "bt-device-5", name: "AirPods Pro", rssi: -75 },
-        ]
+      if (device) {
+        // User selected a device from the browser picker
+        // Web Bluetooth API only returns ONE device at a time
+        console.log("[Bluetooth] Device selected from Chrome picker:", device.name, device.id)
+        const selectedDevice: BTDevice = {
+          id: device.id,
+          name: device.name || "Unknown Device",
+          rssi: undefined, // RSSI not available via Web Bluetooth API - if you see RSSI values, something is wrong
+        }
         
-        setScannedDevices(mockDevices)
+        // Clear any previous devices and set only the one selected
+        setScannedDevices([selectedDevice])
         setIsScanning(false)
         setStep("results")
-      }, 2000)
+        
+        // Update Bluetooth state to reflect permission granted
+        localStorage.setItem("bluetoothPermissionGranted", "true")
+      } else {
+        console.log("[Bluetooth] No device selected")
+        setIsScanning(false)
+        setError("No device selected")
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to scan for Bluetooth devices")
+      if (err.name === "NotFoundError") {
+        // User cancelled the device picker - this is normal
+        setError("No device selected. The browser's device picker will show available Bluetooth devices. Make sure your device is in pairing mode and Bluetooth is enabled.")
+      } else if (err.name === "SecurityError") {
+        setError("Bluetooth permission denied. Please check your browser settings and allow Bluetooth access.")
+      } else if (err.name === "NetworkError") {
+        setError("Bluetooth connection failed. Please ensure Bluetooth is enabled on your device and the target device is in pairing mode.")
+      } else {
+        setError(err.message || "Failed to scan for Bluetooth devices. Make sure Bluetooth is enabled and devices are in pairing mode.")
+      }
       setIsScanning(false)
     }
   }, [bluetooth])
@@ -124,26 +134,45 @@ export default function BluetoothPairingModal({
       // Import Bluetooth connection manager
       const { connectToPairedDevice } = await import("@/lib/bluetooth-connection")
       
-      // Actually connect to the Bluetooth device
+      // Actually connect to the Bluetooth device FIRST
+      // Only proceed if connection succeeds
       let connection = null
+      let isActuallyConnected = false
       try {
         connection = await connectToPairedDevice(
           selectedDevice.id,
           selectedDevice.name
         )
+        // Verify connection is actually established
+        if (connection && connection.server && connection.server.connected) {
+          isActuallyConnected = true
+        } else {
+          throw new Error("Bluetooth connection not established")
+        }
       } catch (connectError: any) {
-        // If connection fails, still create the device entry but mark as not connected
-        console.warn("Bluetooth connection failed, but device will be tracked:", connectError)
+        // If connection fails, don't save the device - show error and return
+        console.error("Bluetooth connection failed:", connectError)
+        setError(`Failed to connect to ${selectedDevice.name}. Make sure the device is in pairing mode and Bluetooth is enabled.`)
+        setStep("name")
+        return
       }
 
-      // Create the paired device
+      // Only proceed if connection was actually established
+      if (!isActuallyConnected) {
+        setError("Failed to establish Bluetooth connection")
+        setStep("name")
+        return
+      }
+
+      // Create the paired device object to pass to parent
+      // Only created if Bluetooth connection succeeded
       const pairedDevice = {
-        id: Date.now().toString(),
+        id: selectedDevice.id, // Use the actual Bluetooth device ID
         name: deviceName.trim(),
-        type: deviceType,
-        status: connection?.connected ? "connected" as const : "away" as const,
-        battery: 100,
-        signal: selectedDevice.rssi ? Math.max(1, Math.min(5, Math.floor((selectedDevice.rssi + 100) / 20))) : 3,
+        type: deviceType, // Pass the actual device type (phone, tablet, watch, etc.)
+        status: "connected" as const, // Only set to connected since we verified connection
+        battery: undefined, // Will be updated when device connects
+        signal: selectedDevice.rssi ? Math.max(1, Math.min(5, Math.floor((selectedDevice.rssi + 100) / 20))) : undefined,
         lastSeen: new Date().toISOString(),
         bluetoothDeviceId: selectedDevice.id,
         bluetoothDeviceName: selectedDevice.name,
@@ -155,7 +184,7 @@ export default function BluetoothPairingModal({
         bluetoothDeviceId: selectedDevice.id,
         bluetoothDeviceName: selectedDevice.name,
         pairedAt: new Date().toISOString(),
-        connected: connection?.connected || false,
+        connected: true, // Always true here since we verified connection
       }
       localStorage.setItem("devicePairings", JSON.stringify(pairings))
 
@@ -231,8 +260,12 @@ export default function BluetoothPairingModal({
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">Ready to Scan</h3>
-                <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-                  Make sure your Bluetooth device is powered on and in pairing mode
+                <p className="text-sm text-muted-foreground text-center mb-4 max-w-sm">
+                  Click "Start Scanning" to open Chrome's Bluetooth device picker
+                </p>
+                <p className="text-xs text-muted-foreground text-center mb-6 max-w-sm px-4">
+                  Chrome's picker will show all nearby devices. Select one device, then it will appear in the app. 
+                  <strong> Chrome's picker shows real devices - not placeholders.</strong>
                 </p>
                 <Button
                   onClick={handleStartScan}
@@ -259,7 +292,10 @@ export default function BluetoothPairingModal({
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">Available Devices</h3>
                   <p className="text-sm text-muted-foreground">
-                    Found {scannedDevices.length} device{scannedDevices.length !== 1 ? "s" : ""}
+                    Found {scannedDevices.length} device{scannedDevices.length !== 1 ? "s" : ""} from Chrome's Bluetooth scanner
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    These are real nearby Bluetooth devices. If your device isn't listed, make sure it's discoverable.
                   </p>
                 </div>
                 <Button
@@ -294,28 +330,34 @@ export default function BluetoothPairingModal({
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <p className="font-semibold text-foreground">{device.name}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Signal: {device.rssi} dBm
-                          </p>
+                          {device.rssi !== undefined ? (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Signal: {device.rssi} dBm
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Bluetooth device detected
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((bar) => {
-                              const signalStrength = device.rssi
-                                ? Math.max(1, Math.min(5, Math.floor((device.rssi + 100) / 20)))
-                                : 0
-                              return (
-                                <div
-                                  key={bar}
-                                  className={`w-1 h-4 rounded-sm ${
-                                    bar <= signalStrength
-                                      ? "bg-primary"
-                                      : "bg-muted"
-                                  }`}
-                                />
-                              )
-                            })}
-                          </div>
+                          {device.rssi !== undefined && (
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map((bar) => {
+                                const signalStrength = Math.max(1, Math.min(5, Math.floor((device.rssi! + 100) / 20)))
+                                return (
+                                  <div
+                                    key={bar}
+                                    className={`w-1 h-4 rounded-sm ${
+                                      bar <= signalStrength
+                                        ? "bg-primary"
+                                        : "bg-muted"
+                                    }`}
+                                  />
+                                )
+                              })}
+                            </div>
+                          )}
                           <Button variant="ghost" size="sm" className="ml-2">
                             Select
                           </Button>

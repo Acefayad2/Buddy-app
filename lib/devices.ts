@@ -159,13 +159,32 @@ export function deviceToUI(device: Device, additionalData?: {
   signal?: number
   distance?: number
   location?: { lat: number; lng: number }
+  type?: "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop"
   bluetoothDeviceId?: string
   bluetoothDeviceName?: string
 }): DeviceWithUI {
   // Map device_type to UI type
+  // Since database only stores 'iOS' or 'Android', we need to infer the actual device type
+  // If additionalData provides a type (from when device was created), use that
+  // Otherwise, default to 'phone' for both iOS and Android
   const typeMap: Record<string, "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop"> = {
     'iOS': 'phone',
     'Android': 'phone',
+  }
+  
+  // If additionalData provides a type, use it (for devices we just created)
+  // Otherwise, try to infer from device name or default to phone
+  let inferredType: "phone" | "tablet" | "watch" | "keys" | "earbuds" | "laptop" = additionalData?.type || 'phone'
+  
+  // Try to infer from device name if type not provided
+  if (!additionalData?.type) {
+    const name = device.device_name.toLowerCase()
+    if (name.includes('ipad') || name.includes('tablet')) inferredType = 'tablet'
+    else if (name.includes('watch')) inferredType = 'watch'
+    else if (name.includes('key')) inferredType = 'keys'
+    else if (name.includes('airpod') || name.includes('earbud') || name.includes('headphone')) inferredType = 'earbuds'
+    else if (name.includes('laptop') || name.includes('macbook')) inferredType = 'laptop'
+    else inferredType = typeMap[device.device_type] || 'phone'
   }
 
   // Use location from database if available, otherwise use additionalData
@@ -179,7 +198,7 @@ export function deviceToUI(device: Device, additionalData?: {
   return {
     id: device.device_id,
     name: device.device_name,
-    type: typeMap[device.device_type] || 'phone',
+    type: inferredType,
     status: additionalData?.status || 'away',
     battery: additionalData?.battery,
     signal: additionalData?.signal,

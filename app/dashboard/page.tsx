@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import AddDeviceModal from "@/components/dashboard/add-device-modal"
 import BluetoothPairingModal from "@/components/dashboard/bluetooth-pairing-modal"
+import { BuddyCharacter } from "@/components/buddy-character"
 import { useBluetooth } from "@/lib/hooks/use-bluetooth"
 import { useAuth } from "@/contexts/auth-context"
 import { getDevicesForUser, createDevice, updateDevice, deleteDevice, deviceToUI } from "@/lib/devices"
@@ -40,6 +41,7 @@ export default function DashboardPage() {
   const [bluetoothMessage, setBluetoothMessage] = useState<string | null>(null)
   const locationTrackingCleanups = useRef<Map<string, () => void>>(new Map())
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Load devices from Supabase
   useEffect(() => {
@@ -131,13 +133,17 @@ export default function DashboardPage() {
           })
           
           // Check Bluetooth connection status if device has Bluetooth ID
-          let deviceStatus = uiDevice.status
+          // Only mark as connected if the actual Bluetooth connection is established
+          let deviceStatus = 'away' // Default to away
           if (uiDevice.bluetoothDeviceId) {
-            const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
             const connection = getDeviceConnection(uiDevice.bluetoothDeviceId)
-            if (isConnected && connection) {
+            const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
+            
+            // Only mark as connected if we have an active connection AND it's verified
+            if (connection && connection.server && connection.server.connected && isConnected) {
               deviceStatus = 'connected'
-            } else if (connection && !connection.connected) {
+            } else {
+              // No connection or connection lost
               deviceStatus = 'away'
             }
           }
@@ -397,8 +403,8 @@ export default function DashboardPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-pulse"></div>
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center space-y-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20 mb-4">
-              <span className="text-4xl">📱</span>
+            <div className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20 mb-4 p-4">
+              <BuddyCharacter size="large" />
             </div>
             <h1 className="text-6xl font-bold bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent tracking-tight">
               Buddy
@@ -493,7 +499,13 @@ export default function DashboardPage() {
       
       <AddDeviceModal 
         isOpen={showAddDeviceModal} 
-        onClose={() => setShowAddDeviceModal(false)} 
+        onClose={() => setShowAddDeviceModal(false)}
+        onDeviceTypeSelect={(deviceType) => {
+          // Handle device type selection (mobile click support)
+          setPendingDeviceType(deviceType)
+          setShowAddDeviceModal(false)
+          setShowPairingModal(true)
+        }}
       />
 
       {pendingDeviceType && (
@@ -507,40 +519,60 @@ export default function DashboardPage() {
             if (!user?.id) return
 
             try {
+              // Map UI device type to database device type
+              // Database only supports 'iOS' or 'Android', so we map based on device type
+              const getDeviceTypeForDB = (type: string): 'iOS' | 'Android' => {
+                // Phones/tablets default to iOS, watches/other default to Android
+                if (type === 'phone' || type === 'tablet') return 'iOS'
+                return 'Android'
+              }
+
               // Create device in Supabase
               const dbDevice = await createDevice(user.id, {
                 device_name: pairedDevice.name,
-                device_type: pairedDevice.type === 'phone' ? 'iOS' : 'Android', // Default to iOS for phones
+                device_type: getDeviceTypeForDB(pairedDevice.type),
                 ble_identifier: pairedDevice.bluetoothDeviceId || `ble-${Date.now()}`,
               })
 
-              // Map to UI format
-              const uiDevice = deviceToUI(dbDevice, {
-                status: pairedDevice.status || 'away',
-                battery: pairedDevice.battery,
-                signal: pairedDevice.signal,
-                bluetoothDeviceId: pairedDevice.bluetoothDeviceId,
-                bluetoothDeviceName: pairedDevice.bluetoothDeviceName,
+              // Reload all devices from database to ensure consistency
+              // This ensures we have the latest data and proper device types
+              const dbDevices = await getDevicesForUser(user.id)
+              const newDeviceId = dbDevice.device_id
+              const uiDevices: Device[] = dbDevices.map(dbDevice => {
+                // For the device we just created, preserve its type and status
+                const isNewDevice = dbDevice.device_id === newDeviceId
+                const uiDevice = deviceToUI(dbDevice, {
+                  status: isNewDevice ? (pairedDevice.status || 'away') : 'away',
+                  battery: isNewDevice ? pairedDevice.battery : undefined,
+                  signal: isNewDevice ? pairedDevice.signal : undefined,
+                  type: isNewDevice ? pairedDevice.type : undefined, // Only preserve type for new device
+                  bluetoothDeviceId: isNewDevice ? pairedDevice.bluetoothDeviceId : undefined,
+                  bluetoothDeviceName: isNewDevice ? pairedDevice.bluetoothDeviceName : undefined,
+                })
+                return {
+                  id: uiDevice.id,
+                  name: uiDevice.name,
+                  type: uiDevice.type,
+                  status: uiDevice.status,
+                  battery: uiDevice.battery || 0,
+                  signal: uiDevice.signal || 0,
+                  lastSeen: uiDevice.lastSeen,
+                  location: uiDevice.location,
+                  bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+                  bluetoothDeviceName: uiDevice.bluetoothDeviceName,
+                }
               })
-
-              const mappedDevice: Device = {
-                id: uiDevice.id,
-                name: uiDevice.name,
-                type: uiDevice.type,
-                status: uiDevice.status,
-                battery: uiDevice.battery || 0,
-                signal: uiDevice.signal || 0,
-                lastSeen: uiDevice.lastSeen,
-                location: uiDevice.location,
-                bluetoothDeviceId: uiDevice.bluetoothDeviceId,
-                bluetoothDeviceName: uiDevice.bluetoothDeviceName,
-              }
-
-              setDevices(prev => [...prev, mappedDevice])
+              
+              setDevices(uiDevices)
               setShowPairingModal(false)
               setPendingDeviceType(null)
-            } catch (error) {
+              
+              // Show success message
+              setBluetoothMessage("Device added successfully!")
+              setTimeout(() => setBluetoothMessage(null), 3000)
+            } catch (error: any) {
               console.error("Error adding device:", error)
+              setBluetoothMessage(error.message || "Failed to add device. Please try again.")
             }
           }}
           deviceType={pendingDeviceType}

@@ -39,13 +39,19 @@ class BluetoothConnectionManager {
       }
 
       // Connect to GATT server
+      // This is where the actual Bluetooth connection happens
       const server = await device.gatt.connect()
+
+      // Verify connection is actually established
+      if (!server || !server.connected) {
+        throw new Error('Failed to establish Bluetooth connection')
+      }
 
       const connection: BluetoothConnection = {
         deviceId: bluetoothDeviceId,
         device: device,
         server: server,
-        connected: server.connected,
+        connected: true, // Only set to true if we verified server.connected
         rssi: null,
         lastSeen: new Date(),
       }
@@ -104,11 +110,15 @@ class BluetoothConnectionManager {
   }
 
   /**
-   * Check if device is connected
+   * Check if device is connected - verifies actual connection status
    */
   isConnected(bluetoothDeviceId: string): boolean {
     const connection = this.connections.get(bluetoothDeviceId)
-    return connection?.connected || false
+    if (!connection) return false
+    
+    // Verify connection is actually established
+    // Check both our internal status and the actual server connection
+    return connection.connected && connection.server?.connected === true
   }
 
   /**
