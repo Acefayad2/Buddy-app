@@ -18,13 +18,27 @@ class BluetoothConnectionManager {
 
   /**
    * Connect to a Bluetooth device and maintain connection
+   * 
+   * NOTE: Web Bluetooth has limitations:
+   * - Cannot reconnect to previously paired devices without user selecting from picker
+   * - Cannot connect to iPhones/iOS devices as peripherals (they don't advertise BLE services)
+   * - Works best with dedicated BLE peripherals (watches, earbuds, trackers, etc.)
    */
   async connectToDevice(
     bluetoothDeviceId: string,
     deviceName: string
   ): Promise<BluetoothConnection> {
     try {
-      // Request device connection
+      // Check if device name suggests it's an iPhone/iOS device
+      // Note: This is a limitation of Web Bluetooth - iOS devices can't be connected to as peripherals
+      const isIOSDevice = /iPhone|iPad|iPod/i.test(deviceName)
+      if (isIOSDevice) {
+        console.warn(`[Bluetooth] ⚠️ Attempting to connect to iOS device "${deviceName}" - this may not work due to Web Bluetooth limitations`)
+      }
+
+      // Request device connection - this will open Chrome's device picker
+      // IMPORTANT: For reconnection, user must select the device again from the picker
+      // The device must be powered on, in range, and advertising BLE services
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ name: deviceName }],
         optionalServices: [

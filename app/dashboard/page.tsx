@@ -628,9 +628,20 @@ export default function DashboardPage() {
                 return
               }
               
+              // Check if this is an iOS device - Web Bluetooth cannot connect to iPhones as peripherals
+              const isIOSDevice = /iPhone|iPad|iPod/i.test(device.name) || /iPhone|iPad|iPod/i.test(device.bluetoothDeviceName)
+              if (isIOSDevice) {
+                setError("⚠️ iOS devices (iPhone/iPad) cannot be connected to via Web Bluetooth. iPhones don't advertise as BLE peripherals that browsers can connect to. For iPhone tracking, consider using the Phone Buddy mobile app or using location-based tracking instead.")
+                return
+              }
+              
               try {
                 console.log(`[Dashboard] Manual connect requested for ${device.bluetoothDeviceName}`)
                 setError(null)
+                
+                // Show info about what will happen
+                console.log(`[Dashboard] Chrome's device picker will open - please select "${device.bluetoothDeviceName}" from the list`)
+                
                 await connectToPairedDevice(device.bluetoothDeviceId, device.bluetoothDeviceName)
                 console.log(`[Dashboard] ✅ Successfully connected to ${device.bluetoothDeviceName}`)
                 
