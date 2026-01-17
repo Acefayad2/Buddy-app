@@ -39,6 +39,8 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
+  const [deviceAddress, setDeviceAddress] = useState<string | null>(null)
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false)
 
   const getDeviceIcon = (type: string) => {
     const icons: Record<string, string> = {
@@ -245,7 +247,13 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
           {/* Right: Connect/Locate Button and Menu */}
           <div className="flex items-center gap-3 flex-shrink-0">
             {/* Connect button - show when device has Bluetooth ID but is not connected */}
-            {device.bluetoothDeviceId && !device.isConnected && (
+            {(() => {
+              const shouldShowConnect = device.bluetoothDeviceId && !device.isConnected
+              if (device.bluetoothDeviceId) {
+                console.log(`[DeviceCard] ${device.name}: bluetoothDeviceId=${device.bluetoothDeviceId}, isConnected=${device.isConnected}, shouldShowConnect=${shouldShowConnect}`)
+              }
+              return shouldShowConnect
+            })() && (
               <Button
                 variant="outline"
                 className="border-primary text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary text-sm h-10 px-6 bg-background shadow-sm hover:shadow-md transition-all duration-300 font-medium"
@@ -415,10 +423,16 @@ export default function DeviceCard({ device, onUpdate, onDelete, onConnect }: De
                   </div>
 
                   <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                    <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Coordinates</p>
-                    <p className="text-base font-medium text-foreground">
-                      {device.location.lat.toFixed(6)}, {device.location.lng.toFixed(6)}
-                    </p>
+                    <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Address</p>
+                    {isLoadingAddress ? (
+                      <p className="text-base font-medium text-foreground">Loading address...</p>
+                    ) : deviceAddress ? (
+                      <p className="text-base font-medium text-foreground">{deviceAddress}</p>
+                    ) : (
+                      <p className="text-base font-medium text-muted-foreground">
+                        {device.location.lat.toFixed(6)}, {device.location.lng.toFixed(6)}
+                      </p>
+                    )}
                   </div>
 
                   {/* Open in Maps Button */}

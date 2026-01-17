@@ -56,19 +56,23 @@ class BluetoothConnectionManager {
         lastSeen: new Date(),
       }
 
-      // Monitor connection status
-      device.addEventListener('gattserverdisconnected', () => {
+      // Monitor connection status - set up disconnect listener BEFORE storing connection
+      const disconnectHandler = () => {
+        console.log(`[Bluetooth] Disconnect event fired for ${deviceName} (${bluetoothDeviceId})`)
         this.handleDisconnect(bluetoothDeviceId)
-      })
+      }
+      device.addEventListener('gattserverdisconnected', disconnectHandler)
 
       // Store connection
       this.connections.set(bluetoothDeviceId, connection)
 
-      // Start monitoring RSSI if available
+      // Start monitoring RSSI and keep-alive immediately
       this.startRSSIMonitoring(bluetoothDeviceId)
 
-      // Start reconnection monitoring
+      // Start aggressive reconnection monitoring
       this.startReconnectionMonitoring(bluetoothDeviceId, deviceName)
+      
+      console.log(`[Bluetooth] ✅ Connection established and monitoring started for ${deviceName} (${bluetoothDeviceId})`)
 
       return connection
     } catch (error: any) {
@@ -142,27 +146,43 @@ class BluetoothConnectionManager {
   }
 
   /**
-   * Start monitoring RSSI (if device supports it)
+   * Start monitoring RSSI and keep connection alive
    */
   private startRSSIMonitoring(bluetoothDeviceId: string): void {
     // RSSI monitoring would require a custom BLE service
-    // For now, we'll update it when we can read it
+    // For now, we'll use this to keep the connection alive
     const connection = this.connections.get(bluetoothDeviceId)
     if (!connection) return
 
-    // Try to read RSSI periodically (if available via custom service)
-    setInterval(async () => {
+    // Keep connection alive by periodically accessing the server
+    const keepAliveInterval = setInterval(async () => {
       try {
-        // This would read from a custom RSSI characteristic
-        // For now, we'll simulate or use a default value
         if (connection.server?.connected) {
+          // Access the server to keep connection alive
+          // Try to get primary service to verify connection is still active
+          // This prevents the connection from timing out
+          try {
+            await connection.server.getPrimaryService('battery_service').catch(() => {
+              // Battery service might not be available - that's OK
+              // Just accessing the server is enough to keep it alive
+            })
+          } catch (e) {
+            // Service not available - connection might still be active
+          }
+          
           // Update last seen
           connection.lastSeen = new Date()
+          connection.connected = true
+        } else {
+          // Connection lost - clear interval, reconnection monitoring will handle reconnect
+          clearInterval(keepAliveInterval)
         }
       } catch (error) {
-        // RSSI not available
+        // Connection might be lost
+        connection.connected = false
+        clearInterval(keepAliveInterval)
       }
-    }, 5000) // Check every 5 seconds
+    }, 3000) // Check every 3 seconds to keep connection alive
   }
 
   /**
@@ -188,28 +208,52 @@ class BluetoothConnectionManager {
 
       // Check if still connected - verify both our status and server status
       const isServerConnected = connection.server?.connected === true
+      const isConnected = connection.connected === true
       
-      if (!isServerConnected || !connection.connected) {
+      // More aggressive connection check - reconnect if either flag is false
+      if (!isServerConnected || !isConnected) {
         console.log(`[Bluetooth] Device ${deviceName} (${bluetoothDeviceId}) disconnected, attempting reconnect...`)
         try {
           // Attempt to reconnect
           if (connection.device.gatt) {
-            const server = await connection.device.gatt.connect()
-            if (server && server.connected) {
-              connection.server = server
-              connection.connected = true
-              connection.lastSeen = new Date()
-              console.log(`[Bluetooth] ✅ Device ${deviceName} (${bluetoothDeviceId}) reconnected successfully`)
-              
-              // Re-add disconnect listener
-              connection.device.addEventListener('gattserverdisconnected', () => {
-                this.handleDisconnect(bluetoothDeviceId)
-              })
+            // Ensure we have a clean reconnect
+            if (connection.server && !connection.server.connected) {
+              // Server exists but not connected - try to reconnect
+              const server = await connection.device.gatt.connect()
+              if (server && server.connected) {
+                connection.server = server
+                connection.connected = true
+                connection.lastSeen = new Date()
+                console.log(`[Bluetooth] ✅ Device ${deviceName} (${bluetoothDeviceId}) reconnected successfully`)
+                
+                // Re-add disconnect listener
+                connection.device.addEventListener('gattserverdisconnected', () => {
+                  this.handleDisconnect(bluetoothDeviceId)
+                })
+              } else {
+                console.warn(`[Bluetooth] ⚠️ Reconnect attempt for ${deviceName} returned server but server.connected is false`)
+                connection.connected = false
+              }
             } else {
-              console.warn(`[Bluetooth] ⚠️ Reconnect attempt for ${deviceName} returned server but server.connected is false`)
+              // No server or server is null - try fresh connection
+              const server = await connection.device.gatt.connect()
+              if (server && server.connected) {
+                connection.server = server
+                connection.connected = true
+                connection.lastSeen = new Date()
+                console.log(`[Bluetooth] ✅ Device ${deviceName} (${bluetoothDeviceId}) connected successfully`)
+                
+                // Re-add disconnect listener
+                connection.device.addEventListener('gattserverdisconnected', () => {
+                  this.handleDisconnect(bluetoothDeviceId)
+                })
+              } else {
+                connection.connected = false
+              }
             }
           } else {
             console.warn(`[Bluetooth] ⚠️ Cannot reconnect to ${deviceName} - device.gatt is null`)
+            connection.connected = false
           }
         } catch (error: any) {
           console.error(`[Bluetooth] ❌ Failed to reconnect to ${deviceName} (${bluetoothDeviceId}):`, error.message || error)
@@ -217,21 +261,29 @@ class BluetoothConnectionManager {
           connection.connected = false
         }
       } else {
-        // Connection is active - update last seen to keep connection alive
+        // Connection is active - verify it's still working and update last seen
         connection.lastSeen = new Date()
-        // Optionally do a lightweight GATT operation to keep connection active
+        connection.connected = true
+        
+        // Do a lightweight check to ensure connection is actually alive
+        // Accessing the server periodically keeps the connection active
         try {
-          // Touch the connection to prevent timeout
           if (connection.server && connection.server.connected) {
-            // Just checking connection is enough to keep it alive
-            // Some devices disconnect after inactivity, so this helps maintain connection
+            // Try to access a service to keep connection alive
+            // This prevents the connection from timing out due to inactivity
+            await connection.server.getPrimaryService('battery_service').catch(() => {
+              // Battery service might not exist - that's OK
+              // Just accessing the server keeps it alive
+            })
           }
         } catch (error) {
-          // If we can't access the server, connection might be lost
+          // Connection might be lost
+          console.warn(`[Bluetooth] Connection verification failed for ${deviceName}, marking as disconnected`)
           connection.connected = false
+          connection.server = null
         }
       }
-    }, 5000) // Check every 5 seconds for faster reconnection
+    }, 3000) // Check every 3 seconds for faster detection and reconnection
 
     this.reconnectIntervals.set(bluetoothDeviceId, interval)
   }

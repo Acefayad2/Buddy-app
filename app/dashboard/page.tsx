@@ -74,20 +74,80 @@ export default function DashboardPage() {
         })
         setDevices(uiDevices)
         
-        // Auto-reconnect to paired Bluetooth devices
+        // Auto-reconnect to paired Bluetooth devices when dashboard loads
+        console.log(`[Dashboard] Auto-reconnecting to ${uiDevices.filter(d => d.bluetoothDeviceId).length} paired devices...`)
         uiDevices.forEach(async (device) => {
           if (device.bluetoothDeviceId && device.bluetoothDeviceName) {
             // Check if already connected
             const existingConnection = getDeviceConnection(device.bluetoothDeviceId)
-            if (!existingConnection || !existingConnection.server?.connected) {
+            const isAlreadyConnected = existingConnection && existingConnection.server?.connected
+            
+            if (!isAlreadyConnected) {
               console.log(`[Dashboard] Auto-reconnecting to ${device.bluetoothDeviceName}...`)
               try {
                 await connectToPairedDevice(device.bluetoothDeviceId, device.bluetoothDeviceName)
                 console.log(`[Dashboard] ✅ Successfully reconnected to ${device.bluetoothDeviceName}`)
+                
+                // Reload devices to update connection status
+                const updatedDevices = await getDevicesForUser(user.id)
+                const updatedUI: Device[] = updatedDevices.map(dbDevice => {
+                  const uiDevice = deviceToUI(dbDevice, {
+                    status: 'away',
+                    battery: undefined,
+                    signal: undefined,
+                  })
+                  
+                  let deviceStatus = 'away'
+                  let signalStrength = uiDevice.signal || 0
+                  let batteryLevel = uiDevice.battery
+                  
+                  if (uiDevice.bluetoothDeviceId) {
+                    const connection = getDeviceConnection(uiDevice.bluetoothDeviceId)
+                    const isConnected = isDeviceConnected(uiDevice.bluetoothDeviceId)
+                    
+                    const hasActiveConnection = connection && (
+                      (connection.server && connection.server.connected) || 
+                      connection.connected ||
+                      isConnected
+                    )
+                    
+                    if (hasActiveConnection) {
+                      deviceStatus = 'connected'
+                      if (connection.rssi !== null && connection.rssi !== undefined) {
+                        if (connection.rssi >= -40) signalStrength = 5
+                        else if (connection.rssi >= -50) signalStrength = 4
+                        else if (connection.rssi >= -60) signalStrength = 3
+                        else if (connection.rssi >= -80) signalStrength = 2
+                        else signalStrength = 1
+                      } else {
+                        signalStrength = 3
+                      }
+                      if (batteryLevel === undefined || batteryLevel === null) {
+                        batteryLevel = 100
+                      }
+                    }
+                  }
+                  
+                  return {
+                    id: uiDevice.id,
+                    name: uiDevice.name,
+                    type: uiDevice.type,
+                    status: deviceStatus,
+                    battery: batteryLevel || 0,
+                    signal: signalStrength,
+                    lastSeen: uiDevice.lastSeen,
+                    location: uiDevice.location,
+                    bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+                    bluetoothDeviceName: uiDevice.bluetoothDeviceName,
+                  }
+                })
+                setDevices(updatedUI)
               } catch (error: any) {
                 console.log(`[Dashboard] ⚠️ Could not auto-reconnect to ${device.bluetoothDeviceName}:`, error.message)
                 // Don't show error - device might be off or out of range
               }
+            } else {
+              console.log(`[Dashboard] Device ${device.bluetoothDeviceName} is already connected`)
             }
           }
         })
@@ -172,8 +232,10 @@ export default function DashboardPage() {
             
             console.log(`[Dashboard] Device ${uiDevice.name}:`, {
               bluetoothDeviceId: uiDevice.bluetoothDeviceId,
+              bluetoothDeviceName: uiDevice.bluetoothDeviceName,
               hasConnection: !!connection,
               serverConnected: connection?.server?.connected,
+              connectionConnected: connection?.connected,
               isConnected,
             })
             
@@ -208,10 +270,12 @@ export default function DashboardPage() {
                 batteryLevel = 100 // Default to 100% if not available
               }
             } else {
-              // No connection or connection lost
+              // No connection or connection lost - device will show Connect button
               deviceStatus = 'away'
-              console.log(`[Dashboard] ❌ Device ${uiDevice.name} is NOT connected`)
+              console.log(`[Dashboard] ❌ Device ${uiDevice.name} is NOT connected - Connect button should appear`)
             }
+          } else {
+            console.log(`[Dashboard] Device ${uiDevice.name} has no Bluetooth ID - cannot connect`)
           }
           
           return {
